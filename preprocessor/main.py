@@ -8,7 +8,7 @@ import time
 import wget
 import zipfile
 import time
-from keys import keys
+from ..keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
 from dataset import *
 
 sqs = boto3.client("sqs", region_name="us-east-1")
@@ -19,7 +19,7 @@ sns = boto3.client("sns", region_name="us-east-1")
 def send_sns(subject, message):
     try:
         sns.publish(
-            TargetArn=keys.SNS_ARN,
+            TargetArn=GeneralKeys.SNS_ARN,
             Message=message,
             Subject=subject,
         )
@@ -43,13 +43,15 @@ def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
                 zipf.write(file_path, os.path.relpath(file_path, local_path))
     print_timestamp(f"Zipped {local_path} to {zip_path}")
 
-    if keys.DEPLOYMENT == "dev":
+    if GeneralKeys.DEPLOYMENT == "dev":
         print_timestamp("Not uploading in dev env")
         return
     s3_key = os.path.join(s3_path, zip_name)
 
-    s3.upload_file(zip_path, keys.S3_BUCKET_NAME, s3_key)
-    print_timestamp(f"Uploaded {zip_path} to s3://{keys.S3_BUCKET_NAME}/{s3_key}")
+    s3.upload_file(zip_path, GeneralKeys.S3_BUCKET_NAME, s3_key)
+    print_timestamp(
+        f"Uploaded {zip_path} to s3://{GeneralKeys.S3_BUCKET_NAME}/{s3_key}"
+    )
 
 
 def process_and_upload_dataset(url, dtype, model, names=None):
@@ -57,21 +59,21 @@ def process_and_upload_dataset(url, dtype, model, names=None):
         f"Training {model}",
         f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
-    if dtype not in keys.input_types:
+    if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
         print_timestamp(f"{dtype} download type not supported")
 
-    if dtype == keys.TYPE_ROBOFLOW:
+    if dtype == PreProcessorKeys.TYPE_ROBOFLOW:
         print_timestamp(f"{dtype} support in progress")
         return
         # for dl_format in ROBOFLOW_SUPPORTED_DATASETS:
         #    dataset_dir = download_dataset_from_roboflow(url, dl_format, keys.ROBOFLOW_KEY)
         #     upload_to_s3(dataset_dir, "dataset", zip_name=f"{dl_format}.zip")
 
-    elif dtype == keys.TYPE_ZIPFILE:
+    elif dtype == PreProcessorKeys.TYPE_ZIPFILE:
         print_timestamp(f"{dtype} support in progress")
         return
 
-    elif dtype == keys.TYPE_VISDRONE:
+    elif dtype == PreProcessorKeys.TYPE_VISDRONE:
         if names is None:
             print_timestamp("Names are required for visdrone")
             return
@@ -85,7 +87,7 @@ def process_and_upload_dataset(url, dtype, model, names=None):
 
         print_timestamp("Converting to YOLO format")
         visdrone2yolo(dir_name, names)
-        upload_to_s3(dir_name, "dataset", zip_name="yolo.zip")
+        upload_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip")
 
         splits = ["test", "train", "valid"]
         print_timestamp("Converting to COCO format")
@@ -101,7 +103,7 @@ def process_and_upload_dataset(url, dtype, model, names=None):
                 shutil.move(str(file_path), str(dir_name / split))
             os.rmdir(dir_name / split / "images")
         os.remove(dir_name / "data.yaml")
-        upload_to_s3(dir_name, "dataset", zip_name="coco.zip")
+        upload_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip")
 
         os.remove("visdrone.zip")
         shutil.rmtree(dir_name)
@@ -109,7 +111,7 @@ def process_and_upload_dataset(url, dtype, model, names=None):
 
         send_sns(
             f"Training {model}",
-            f"Converted dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\ndatasets location: {keys.S3_BUCKET_NAME}/datasets/",
+            f"Converted dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\ndatasets location: {GeneralKeys.S3_BUCKET_NAME}/datasets/",
         )
 
 
@@ -121,9 +123,9 @@ def trigger_training(model, params):
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt install python3-full python3-pip git libgl1 -y
-git clone https://ibrahimmkhalid:{keys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/trainer /home/ubuntu/trainer
+git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer
 cd /home/ubuntu/trainer
-echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={keys.S3_BUCKET_NAME}\nSNS_ARN={keys.SNS_ARN}\nMODEL_TO_TRAIN={model}" >> .env
+echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train" >> .env
 echo '{json.dumps(params)}' >> params.json
 python3 -m venv venv
 source venv/bin/activate
@@ -142,7 +144,7 @@ sudo shutdown -h now
         MaxCount=1,
         UserData=user_data_script,
         IamInstanceProfile={
-            "Arn": os.getenv("EC2_INSTANCE_IAM_ARM"),
+            "Arn": os.getenv("EC2_INSTANCE_IAM_ARN"),
         },
         BlockDeviceMappings=[
             {
@@ -192,7 +194,7 @@ sudo shutdown -h now
 def listen_to_sqs():
     while True:
         response = sqs.receive_message(
-            QueueUrl=keys.SQS_QUEUE_URL,
+            QueueUrl=GeneralKeys.SQS_QUEUE_URL,
             MaxNumberOfMessages=1,
             WaitTimeSeconds=10,
         )
@@ -210,7 +212,7 @@ def listen_to_sqs():
 
                 # Delete message early to avoid over run model training
                 sqs.delete_message(
-                    QueueUrl=keys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
+                    QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
                 )
                 print_timestamp("Processed and deleted message from SQS.")
 
@@ -228,7 +230,7 @@ def listen_to_sqs():
                          Error: {e}""",
                 )
                 sqs.delete_message(
-                    QueueUrl=keys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
+                    QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
                 )
                 print_timestamp("Deleted message from SQS with errors")
         else:
@@ -236,11 +238,11 @@ def listen_to_sqs():
         time.sleep(5)  # Poll every 5 seconds
 
 
-if __name__ == "__main__":
-    if keys.DEPLOYMENT == "dev":
+def run():
+    if GeneralKeys.DEPLOYMENT == "dev":
         process_and_upload_dataset(
             "file:///mnt/d/datasets/VisDroneSmall.zip",
-            dtype=keys.TYPE_VISDRONE,
+            dtype=PreProcessorKeys.TYPE_VISDRONE,
             names=[
                 "pedestrian",
                 "people",
@@ -253,8 +255,7 @@ if __name__ == "__main__":
                 "bus",
                 "motor",
             ],
-            model="yolo",
+            model=TrainerKeys.MODEL_YOLO,
         )
-        process_and_upload_dataset("", dtype=keys.TYPE_ROBOFLOW, names=[], model="yolo")
     else:
         listen_to_sqs()
