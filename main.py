@@ -1,7 +1,8 @@
 from dotenv import load_dotenv
-from keys import GeneralKeys
 
 load_dotenv()
+
+from keys import GeneralKeys
 
 if GeneralKeys.RUNNER == "pre":
     from preprocessor.main import run
