@@ -1,33 +1,28 @@
 import zipfile
 import boto3
 import os
-from dotenv import load_dotenv
 import boto3
 import os
 import time
 import traceback
+from ..keys import GeneralKeys, TrainerKeys, DatasetKeys
 
-load_dotenv()
 
 sns = boto3.client("sns", region_name="us-east-1")
 s3 = boto3.client("s3")
 
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
-SNS_ARN = os.getenv("SNS_ARN")
-DEPLOYMENT = os.getenv("DEPLOYMENT")
-
 
 def download_dataset_from_s3(name):
     s3_key = os.path.join("dataset", name)
-    s3.download_file(S3_BUCKET_NAME, s3_key, name)
+    s3.download_file(GeneralKeys.S3_BUCKET_NAME, s3_key, name)
     with zipfile.ZipFile(name, "r") as z:
         z.extractall("data")
 
 
 def train(model):
-    if model == "yolo":
+    if model == TrainerKeys.MODEL_YOLO:
         from yolo_trainer import train_main
-    elif model == "rtdetr":
+    elif model == TrainerKeys.MODEL_RTDETR:
         from rtdetr_trainer import train_main
     else:
         pass
@@ -49,13 +44,13 @@ def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
                 file_path = os.path.join(root, file)
                 zipf.write(file_path, os.path.relpath(file_path, local_path))
 
-    if DEPLOYMENT == "dev":
+    if GeneralKeys.DEPLOYMENT == "dev":
         print("Not uploading in dev env")
         return ""
     s3_key = os.path.join(s3_path, zip_name)
 
-    s3.upload_file(zip_path, S3_BUCKET_NAME, s3_key)
-    ret = f"Uploaded {zip_path} to s3://{S3_BUCKET_NAME}/{s3_key}"
+    s3.upload_file(zip_path, GeneralKeys.S3_BUCKET_NAME, s3_key)
+    ret = f"Uploaded {zip_path} to s3://{GeneralKeys.S3_BUCKET_NAME}/{s3_key}"
     print(ret)
     return ret
 
@@ -63,7 +58,7 @@ def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
 def send_sns(subject, message):
     try:
         sns.publish(
-            TargetArn=SNS_ARN,
+            TargetArn=GeneralKeys.SNS_ARN,
             Message=message,
             Subject=subject,
         )
@@ -73,16 +68,19 @@ def send_sns(subject, message):
         pass
 
 
-if __name__ == "__main__":
+def run():
     model = os.getenv("MODEL_TO_TRAIN")
     if model is None:
-        model = "yolo"
+        model = TrainerKeys.MODEL_YOLO
 
     dataset = None
-    if model in ["yolo", "rtdetr"]:
-        dataset = "yolo"
+    if model in [
+        TrainerKeys.MODEL_RTDETR,
+        TrainerKeys.MODEL_YOLO,
+    ]:
+        dataset = DatasetKeys.YOLO_FORMAT
 
-    if DEPLOYMENT != "dev":
+    if GeneralKeys.DEPLOYMENT != "dev":
         download_dataset_from_s3(f"{dataset}.zip")
 
     send_sns(
