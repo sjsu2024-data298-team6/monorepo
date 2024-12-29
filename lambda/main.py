@@ -3,17 +3,14 @@ import boto3
 import os
 import ast
 
-# Initialize SQS client
 sqs = boto3.client("sqs")
 
-# Get SQS queue URL from an environment variable
 QUEUE_URL = os.environ.get(
     "SQS_QUEUE_URL"
-)  # Set this in your Lambda environment variables
+)
 
 
 def lambda_handler(event, context):
-    # Extract roboflow URL from query string parameters
     try:
         url = event.get("queryStringParameters", {}).get("url")
         dtype = event.get("queryStringParameters", {}).get("dataset_type")
@@ -36,7 +33,6 @@ def lambda_handler(event, context):
         }
 
     try:
-        # Send message to SQS
         response = sqs.send_message(
             QueueUrl=QUEUE_URL,
             MessageBody=json.dumps(
@@ -50,7 +46,6 @@ def lambda_handler(event, context):
             ),
         )
 
-        # Return success response with the SQS message ID
         return {
             "statusCode": 200,
             "body": json.dumps(
@@ -62,7 +57,6 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
-        # Handle any errors
         return {
             "statusCode": 500,
             "body": json.dumps(f"Error sending message to SQS: {str(e)}"),
