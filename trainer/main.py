@@ -5,7 +5,7 @@ import boto3
 import os
 import time
 import traceback
-from ..keys import GeneralKeys, TrainerKeys, DatasetKeys
+from keys import GeneralKeys, TrainerKeys, DatasetKeys
 
 
 sns = boto3.client("sns", region_name="us-east-1")
@@ -21,9 +21,9 @@ def download_dataset_from_s3(name):
 
 def train(model):
     if model == TrainerKeys.MODEL_YOLO:
-        from yolo_trainer import train_main
+        from trainer.yolo_trainer import train_main
     elif model == TrainerKeys.MODEL_RTDETR:
-        from rtdetr_trainer import train_main
+        from trainer.rtdetr_trainer import train_main
     else:
         pass
 

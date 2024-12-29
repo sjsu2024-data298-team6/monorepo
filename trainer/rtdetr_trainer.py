@@ -4,7 +4,7 @@ from ultralytics import RTDETR
 import matplotlib.pyplot as plt
 import os
 from pathlib import Path
-from params import rtdetr_params
+from trainer.params import rtdetr_params
 
 
 def train_main():
