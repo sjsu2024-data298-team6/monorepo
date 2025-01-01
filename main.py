@@ -5,13 +5,13 @@ load_dotenv()
 from keys import GeneralKeys
 
 if GeneralKeys.RUNNER == "pre":
-    from preprocessor.main import run
+    from preprocessor.preprocessor import run
 
     run()
     exit()
 
 if GeneralKeys.RUNNER == "train":
-    from trainer.main import run
+    from trainer.trainer import run
 
     run()
     exit()
