@@ -9,7 +9,7 @@ import wget
 import zipfile
 import time
 from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
-from dataset import *
+from preprocessor.dataset import *
 
 sqs = boto3.client("sqs", region_name="us-east-1")
 s3 = boto3.client("s3")
