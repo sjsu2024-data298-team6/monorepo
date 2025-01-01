@@ -25,7 +25,7 @@ def train(model):
     elif model == TrainerKeys.MODEL_RTDETR:
         from trainer.rtdetr_trainer import train_main
     else:
-        pass
+        return "Model {model} not yet supported", False
 
     try:
         return train_main(), True
