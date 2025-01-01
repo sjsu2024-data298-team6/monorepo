@@ -68,17 +68,22 @@ def send_sns(subject, message):
         pass
 
 
-def run():
-    model = os.getenv("MODEL_TO_TRAIN")
-    if model is None:
-        model = TrainerKeys.MODEL_YOLO
-
+def getDataset(model):
     dataset = None
     if model in [
         TrainerKeys.MODEL_RTDETR,
         TrainerKeys.MODEL_YOLO,
     ]:
         dataset = DatasetKeys.YOLO_FORMAT
+    return dataset
+
+
+def run():
+    model = os.getenv("MODEL_TO_TRAIN")
+    if model is None:
+        model = TrainerKeys.MODEL_YOLO
+
+    dataset = getDataset(model)
 
     if GeneralKeys.DEPLOYMENT != "dev":
         download_dataset_from_s3(f"{dataset}.zip")

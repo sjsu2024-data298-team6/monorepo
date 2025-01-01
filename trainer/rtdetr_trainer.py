@@ -7,7 +7,7 @@ from pathlib import Path
 from trainer.params import rtdetr_params
 
 
-def train_main():
+def train_main() -> str:
     model_params = rtdetr_params()
     cwd = Path(os.getcwd())
 
@@ -48,7 +48,7 @@ def iou(boxA, boxB):
     return iou
 
 
-def get_inference(model, test_base):
+def get_inference(model, test_base) -> str:
     label_path = f"{test_base}/labels"
     test_path = f"{test_base}/images"
 
