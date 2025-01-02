@@ -12,7 +12,7 @@ logger = logging.getLogger("sfdt_trainer")
 logging.basicConfig(
     filename="sfdt_trainer.log",
     encoding="utf-8",
-    level=logging.DEBUG,
+    level=logging.INFO,
 )
 
 sns = boto3.client("sns", region_name="us-east-1")

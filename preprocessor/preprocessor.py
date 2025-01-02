@@ -17,7 +17,7 @@ logger = logging.getLogger("sfdt_preprocessor")
 logging.basicConfig(
     filename="sfdt_preprocessor.log",
     encoding="utf-8",
-    level=logging.DEBUG,
+    level=logging.INFO,
 )
 
 sqs = boto3.client("sqs", region_name="us-east-1")
