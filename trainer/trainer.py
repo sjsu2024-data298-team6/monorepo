@@ -6,7 +6,14 @@ import os
 import time
 import traceback
 from keys import GeneralKeys, TrainerKeys, DatasetKeys
+import logging
 
+logger = logging.getLogger("sfdt_trainer")
+logging.basicConfig(
+    filename="sfdt_trainer.log",
+    encoding="utf-8",
+    level=logging.DEBUG,
+)
 
 sns = boto3.client("sns", region_name="us-east-1")
 s3 = boto3.client("s3")
@@ -45,13 +52,13 @@ def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
                 zipf.write(file_path, os.path.relpath(file_path, local_path))
 
     if GeneralKeys.DEPLOYMENT == "dev":
-        print("Not uploading in dev env")
+        logger.info("Not uploading in dev env")
         return ""
     s3_key = os.path.join(s3_path, zip_name)
 
     s3.upload_file(zip_path, GeneralKeys.S3_BUCKET_NAME, s3_key)
     ret = f"Uploaded {zip_path} to s3://{GeneralKeys.S3_BUCKET_NAME}/{s3_key}"
-    print(ret)
+    logger.info(ret)
     return ret
 
 
@@ -64,7 +71,9 @@ def send_sns(subject, message):
         )
 
     except Exception as e:
-        print("Failed to send message")
+        logger.info("Failed to send message")
+        logger.debug(e)
+        logger.debug(traceback.format_exc())
         pass
 
 

@@ -9,7 +9,16 @@ import wget
 import zipfile
 import time
 from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
+import logging
+import traceback
 from preprocessor.dataset import *
+
+logger = logging.getLogger("sfdt_preprocessor")
+logging.basicConfig(
+    filename="sfdt_preprocessor.log",
+    encoding="utf-8",
+    level=logging.DEBUG,
+)
 
 sqs = boto3.client("sqs", region_name="us-east-1")
 s3 = boto3.client("s3")
@@ -25,13 +34,10 @@ def send_sns(subject, message):
         )
 
     except Exception as e:
-        print("Failed to send message")
+        logger.info("Failed to send message")
+        logger.debug(e)
+        logger.debug(traceback.format_exc())
         pass
-
-
-def print_timestamp(*args, **kwargs):
-    print(f"[{time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime()):^25}]", end=" ")
-    print(*args, **kwargs)
 
 
 def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
@@ -41,17 +47,15 @@ def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
             for file in files:
                 file_path = os.path.join(root, file)
                 zipf.write(file_path, os.path.relpath(file_path, local_path))
-    print_timestamp(f"Zipped {local_path} to {zip_path}")
+    logger.info(f"Zipped {local_path} to {zip_path}")
 
     if GeneralKeys.DEPLOYMENT == "dev":
-        print_timestamp("Not uploading in dev env")
+        logger.info("Not uploading in dev env")
         return
     s3_key = os.path.join(s3_path, zip_name)
 
     s3.upload_file(zip_path, GeneralKeys.S3_BUCKET_NAME, s3_key)
-    print_timestamp(
-        f"Uploaded {zip_path} to s3://{GeneralKeys.S3_BUCKET_NAME}/{s3_key}"
-    )
+    logger.info(f"Uploaded {zip_path} to s3://{GeneralKeys.S3_BUCKET_NAME}/{s3_key}")
 
 
 def process_and_upload_dataset(url, dtype, model, names=None):
@@ -60,37 +64,37 @@ def process_and_upload_dataset(url, dtype, model, names=None):
         f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
     if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
-        print_timestamp(f"{dtype} download type not supported")
+        logger.warning(f"{dtype} download type not supported")
 
     if dtype == PreProcessorKeys.TYPE_ROBOFLOW:
-        print_timestamp(f"{dtype} support in progress")
+        logger.warning(f"{dtype} support in progress")
         return
         # for dl_format in ROBOFLOW_SUPPORTED_DATASETS:
         #    dataset_dir = download_dataset_from_roboflow(url, dl_format, keys.ROBOFLOW_KEY)
         #     upload_to_s3(dataset_dir, "dataset", zip_name=f"{dl_format}.zip")
 
     elif dtype == PreProcessorKeys.TYPE_ZIPFILE:
-        print_timestamp(f"{dtype} support in progress")
+        logger.warning(f"{dtype} support in progress")
         return
 
     elif dtype == PreProcessorKeys.TYPE_VISDRONE:
         if names is None:
-            print_timestamp("Names are required for visdrone")
+            logger.error("Names are required for visdrone")
             return
 
-        print_timestamp("Downloading original dataset")
+        logger.info(f"Started download for dataset at {url}")
         wget.download(url=url, out="visdrone.zip", bar=None)
         with zipfile.ZipFile("visdrone.zip", "r") as zipf:
             dir_name = Path("./" + zipf.namelist()[0])
-            print_timestamp("Unzipped to ", dir_name)
+            logger.info(f"Unzipped dataset to {dir_name}")
             zipf.extractall()
 
-        print_timestamp("Converting to YOLO format")
+        logger.info("Converting dataset to YOLO format")
         visdrone2yolo(dir_name, names)
         upload_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip")
 
         splits = ["test", "train", "valid"]
-        print_timestamp("Converting to COCO format")
+        logger.info("Converting dataset to COCO format")
         for split in splits:
             yolo_to_coco(
                 dir_name / split / "images",
@@ -107,7 +111,7 @@ def process_and_upload_dataset(url, dtype, model, names=None):
 
         os.remove("visdrone.zip")
         shutil.rmtree(dir_name)
-        print_timestamp("Done")
+        logger.info("Dataset conversions complete")
 
         send_sns(
             f"Training {model}",
@@ -187,7 +191,7 @@ sudo shutdown -h now
     )
 
     instance_id = response["Instances"][0]["InstanceId"]
-    print_timestamp(f"Trainer EC2 instance launched: {instance_id}")
+    logger.info(f"Trainer EC2 instance launched: {instance_id}")
     send_sns(f"Training {model}", f"Trainer EC2 instance launched: {instance_id}")
 
 
@@ -214,7 +218,7 @@ def listen_to_sqs():
                 sqs.delete_message(
                     QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
                 )
-                print_timestamp("Processed and deleted message from SQS.")
+                logger.info("Processed and deleted message from SQS.")
 
                 # Process the dataset
                 process_and_upload_dataset(
@@ -223,7 +227,7 @@ def listen_to_sqs():
                 trigger_training(model, params)
 
             except Exception as e:
-                print_timestamp(f"Error processing message: {e}")
+                logger.error(f"Error processing message: {e}")
                 send_sns(
                     "Error | reading request",
                     f"""Project: pipeline
@@ -232,9 +236,9 @@ def listen_to_sqs():
                 sqs.delete_message(
                     QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
                 )
-                print_timestamp("Deleted message from SQS with errors")
+                logger.info("Deleted message from SQS with errors")
         else:
-            print_timestamp("No messages in queue. Waiting...")
+            logger.info("No messages in queue. Waiting...")
         time.sleep(5)  # Poll every 5 seconds
 
 
