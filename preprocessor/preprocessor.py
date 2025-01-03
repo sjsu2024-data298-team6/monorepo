@@ -124,21 +124,32 @@ def trigger_training(model, params):
 
     # Define User Data script
     user_data_script = f"""#!/bin/bash
+# update and install required packages
 sudo apt update -y
 sudo apt upgrade -y
 sudo apt install python3-full python3-pip git amazon-ec2-utils libgl1 -y
 wget https://amazoncloudwatch-agent.s3.amazonaws.com/debian/amd64/latest/amazon-cloudwatch-agent.deb
 sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+
+# configure and start cloudwatch agent
 echo "{{\\"logs\\":{{\\"logs_collected\\":{{\\"files\\":{{\\"collect_list\\":[{{\\"file_path\\":\\"/home/ubuntu/trainer/sfdt_trainer.log\\",\\"log_group_name\\":\\"sfdt-log-group\\",\\"log_stream_name\\":\\"trainer/{model}/instance-$(ec2-metadata -i | awk '{{print $2}}')\\"}}]}}}}}}}}" | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null
 sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+
+# get code
 git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer
+
+# setup environment
 cd /home/ubuntu/trainer
 echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train" >> .env
 echo '{json.dumps(params)}' >> params.json
 python3 -m venv venv
 source venv/bin/activate
+
+# install python packages and run
 pip install -r requirements.txt
 python3 main.py
+
+# exit
 sudo shutdown -h now
     """
 
