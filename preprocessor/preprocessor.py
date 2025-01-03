@@ -126,7 +126,11 @@ def trigger_training(model, params):
     user_data_script = f"""#!/bin/bash
 sudo apt update -y
 sudo apt upgrade -y
-sudo apt install python3-full python3-pip git libgl1 -y
+sudo apt install python3-full python3-pip git amazon-ec2-utils libgl1 -y
+wget https://amazoncloudwatch-agent.s3.amazonaws.com/debian/amd64/latest/amazon-cloudwatch-agent.deb
+sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+echo "{{\\"logs\\":{{\\"logs_collected\\":{{\\"files\\":{{\\"collect_list\\":[{{\\"file_path\\":\\"/home/ubuntu/trainer/sfdt_trainer.log\\",\\"log_group_name\\":\\"sfdt-log-group\\",\\"log_stream_name\\":\\"trainer/{model}/instance-$(ec2-metadata -i | awk '{{print $2}}')\\"}}]}}}}}}}}" | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null
+sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
 git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer
 cd /home/ubuntu/trainer
 echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train" >> .env
@@ -135,7 +139,6 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
-sudo shutdown -h now
     """
 
     # Launch EC2 instance
@@ -244,22 +247,23 @@ def listen_to_sqs():
 
 def run():
     if GeneralKeys.DEPLOYMENT == "dev":
-        process_and_upload_dataset(
-            "file:///mnt/d/datasets/VisDroneSmall.zip",
-            dtype=PreProcessorKeys.TYPE_VISDRONE,
-            names=[
-                "pedestrian",
-                "people",
-                "bicycle",
-                "car",
-                "van",
-                "truck",
-                "tricycle",
-                "awning-tricycle",
-                "bus",
-                "motor",
-            ],
-            model=TrainerKeys.MODEL_YOLO,
-        )
+        trigger_training(TrainerKeys.MODEL_YOLO, {})
+        # process_and_upload_dataset(
+        #     "file:///mnt/d/datasets/VisDroneSmall.zip",
+        #     dtype=PreProcessorKeys.TYPE_VISDRONE,
+        #     names=[
+        #         "pedestrian",
+        #         "people",
+        #         "bicycle",
+        #         "car",
+        #         "van",
+        #         "truck",
+        #         "tricycle",
+        #         "awning-tricycle",
+        #         "bus",
+        #         "motor",
+        #     ],
+        #     model=TrainerKeys.MODEL_YOLO,
+        # )
     else:
         listen_to_sqs()
