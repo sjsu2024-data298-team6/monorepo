@@ -139,6 +139,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python3 main.py
+sudo shutdown -h now
     """
 
     # Launch EC2 instance
@@ -247,7 +248,6 @@ def listen_to_sqs():
 
 def run():
     if GeneralKeys.DEPLOYMENT == "dev":
-        trigger_training(TrainerKeys.MODEL_YOLO, {})
         # process_and_upload_dataset(
         #     "file:///mnt/d/datasets/VisDroneSmall.zip",
         #     dtype=PreProcessorKeys.TYPE_VISDRONE,
@@ -265,5 +265,6 @@ def run():
         #     ],
         #     model=TrainerKeys.MODEL_YOLO,
         # )
+        trigger_training(TrainerKeys.MODEL_YOLO, {})
     else:
         listen_to_sqs()
