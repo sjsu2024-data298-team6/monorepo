@@ -20,7 +20,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-sqs = boto3.client("sqs", region_name="us-east-1")
 sns = SNSHandler(logger=logger)
 s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 
@@ -185,6 +184,7 @@ sudo shutdown -h now
 
 
 def listen_to_sqs():
+    sqs = boto3.client("sqs", region_name="us-east-1")
     while True:
         response = sqs.receive_message(
             QueueUrl=GeneralKeys.SQS_QUEUE_URL,
