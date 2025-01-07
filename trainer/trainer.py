@@ -7,6 +7,8 @@ import time
 import traceback
 from keys import GeneralKeys, TrainerKeys, DatasetKeys
 import logging
+from aws_handler import SNSHandler
+
 
 logger = logging.getLogger("sfdt_trainer")
 logging.basicConfig(
@@ -15,7 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
-sns = boto3.client("sns", region_name="us-east-1")
+sns = SNSHandler(logger=logger)
 s3 = boto3.client("s3")
 
 
@@ -62,21 +64,6 @@ def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
     return ret
 
 
-def send_sns(subject, message):
-    try:
-        sns.publish(
-            TargetArn=GeneralKeys.SNS_ARN,
-            Message=message,
-            Subject=subject,
-        )
-
-    except Exception as e:
-        logger.info("Failed to send message")
-        logger.debug(e)
-        logger.debug(traceback.format_exc())
-        pass
-
-
 def getDataset(model):
     dataset = None
     if model in [
@@ -97,7 +84,7 @@ def run():
     if GeneralKeys.DEPLOYMENT != "dev":
         download_dataset_from_s3(f"{dataset}.zip")
 
-    send_sns(
+    sns.send(
         f"Training {model}",
         f"Model:{model}\nDataset:{dataset}\nStarted training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
@@ -114,4 +101,4 @@ def run():
     message.append(model_results)
 
     message = "\n\n\n".join(message)
-    send_sns(f"Training {model}", message)
+    sns.send(f"Training {model}", message)

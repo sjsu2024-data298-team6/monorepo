@@ -10,8 +10,8 @@ import zipfile
 import time
 from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
 import logging
-import traceback
 from preprocessor.dataset import *
+from aws_handler import SNSHandler
 
 logger = logging.getLogger("sfdt_preprocessor")
 logging.basicConfig(
@@ -22,22 +22,7 @@ logging.basicConfig(
 
 sqs = boto3.client("sqs", region_name="us-east-1")
 s3 = boto3.client("s3")
-sns = boto3.client("sns", region_name="us-east-1")
-
-
-def send_sns(subject, message):
-    try:
-        sns.publish(
-            TargetArn=GeneralKeys.SNS_ARN,
-            Message=message,
-            Subject=subject,
-        )
-
-    except Exception as e:
-        logger.info("Failed to send message")
-        logger.debug(e)
-        logger.debug(traceback.format_exc())
-        pass
+sns = SNSHandler(logger=logger)
 
 
 def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
@@ -59,7 +44,7 @@ def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
 
 
 def process_and_upload_dataset(url, dtype, model, names=None):
-    send_sns(
+    sns.send(
         f"Training {model}",
         f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
@@ -113,7 +98,7 @@ def process_and_upload_dataset(url, dtype, model, names=None):
         shutil.rmtree(dir_name)
         logger.info("Dataset conversions complete")
 
-        send_sns(
+        sns.send(
             f"Training {model}",
             f"Converted dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\ndatasets location: {GeneralKeys.S3_BUCKET_NAME}/datasets/",
         )
@@ -207,7 +192,10 @@ sudo shutdown -h now
 
     instance_id = response["Instances"][0]["InstanceId"]
     logger.info(f"Trainer EC2 instance launched: {instance_id}")
-    send_sns(f"Training {model}", f"Trainer EC2 instance launched: {instance_id}")
+    sns.send(
+        f"Training {model}",
+        f"Trainer EC2 instance launched: {instance_id}",
+    )
 
 
 def listen_to_sqs():
@@ -243,7 +231,7 @@ def listen_to_sqs():
 
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
-                send_sns(
+                sns.send(
                     "Error | reading request",
                     f"""Project: pipeline
                          Error: {e}""",
@@ -259,23 +247,23 @@ def listen_to_sqs():
 
 def run():
     if GeneralKeys.DEPLOYMENT == "dev":
-        # process_and_upload_dataset(
-        #     "file:///mnt/d/datasets/VisDroneSmall.zip",
-        #     dtype=PreProcessorKeys.TYPE_VISDRONE,
-        #     names=[
-        #         "pedestrian",
-        #         "people",
-        #         "bicycle",
-        #         "car",
-        #         "van",
-        #         "truck",
-        #         "tricycle",
-        #         "awning-tricycle",
-        #         "bus",
-        #         "motor",
-        #     ],
-        #     model=TrainerKeys.MODEL_YOLO,
-        # )
-        trigger_training(TrainerKeys.MODEL_YOLO, {})
+        process_and_upload_dataset(
+            "file:///mnt/d/datasets/VisDroneSmall.zip",
+            dtype=PreProcessorKeys.TYPE_VISDRONE,
+            names=[
+                "pedestrian",
+                "people",
+                "bicycle",
+                "car",
+                "van",
+                "truck",
+                "tricycle",
+                "awning-tricycle",
+                "bus",
+                "motor",
+            ],
+            model=TrainerKeys.MODEL_YOLO,
+        )
+        # trigger_training(TrainerKeys.MODEL_YOLO, {})
     else:
         listen_to_sqs()
