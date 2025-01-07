@@ -4,15 +4,31 @@ import time
 import traceback
 from keys import GeneralKeys, TrainerKeys, DatasetKeys
 import logging
+import json
 from aws_handler import S3Handler, SNSHandler
 
 
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "logger": record.name,
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "time": self.formatTime(record, self.datefmt),
+            "file": record.pathname,
+            "line": record.lineno,
+        }
+        return json.dumps(log_entry)
+
+
 logger = logging.getLogger("sfdt_trainer")
-logging.basicConfig(
-    filename="sfdt_trainer.log",
-    encoding="utf-8",
-    level=logging.INFO,
-)
+handler = logging.FileHandler("sfdt_trainer.log", encoding="utf-8")
+
+json_formatter = JsonFormatter()
+handler.setFormatter(json_formatter)
+
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 sns = SNSHandler(logger=logger)
 s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
@@ -26,6 +42,7 @@ def download_dataset_from_s3(name):
 
 
 def train(model):
+    logger.info(f"Started training for {model}")
     if model == TrainerKeys.MODEL_YOLO:
         from trainer.yolo_trainer import train_main
     elif model == TrainerKeys.MODEL_RTDETR:
@@ -34,7 +51,7 @@ def train(model):
         return "Model {model} not yet supported", False
 
     try:
-        return train_main(), True
+        return train_main(logger), True
     except Exception as e:
         return (
             f"Training of model '{model}' failed somewhere, please check manually\n\n\nExcpetion:\n{e}\n\n\nTraceback:\n{traceback.format_exc()}",

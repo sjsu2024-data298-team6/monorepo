@@ -5,14 +5,22 @@ import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 from trainer.params import rtdetr_params
+import logging
+
+logger = None
 
 
-def train_main() -> str:
+def train_main(logger_) -> str:
+    logger = logger_
+    assert isinstance(logger, logging.Logger)
     model_params = rtdetr_params()
+    logger.info(f"Params: {model_params}")
     cwd = Path(os.getcwd())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = RTDETR("rtdetr-l.pt")
+    model = RTDETR("yolo11n.pt")
+    logger.info("Loaded baseline model")
+    logger.info("testing\n\nfindme\n\ntesting")
     model.train(
         data=cwd / "data/data.yaml",
         epochs=model_params.epochs,
@@ -20,12 +28,14 @@ def train_main() -> str:
         batch=model_params.batch,
         device=device,
     )
+    logger.info("finished training")
 
     with open(cwd / "data/data.yaml", "r") as file:
         yaml_content = yaml.safe_load(file)
     test_base = yaml_content["test"].split(".")[-1][1:]
     test_base = cwd / "data" / test_base
 
+    logger.info("Started inference")
     return get_inference(model, f"{cwd}/data/test")
 
 
@@ -116,7 +126,3 @@ def get_inference(model, test_base) -> str:
     with open("./runs/summary_results.txt", "w") as f:
         f.write(results)
     return results
-
-
-if __name__ == "__main__":
-    train_main()
