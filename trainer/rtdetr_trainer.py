@@ -18,7 +18,7 @@ def train_main(logger_) -> str:
     cwd = Path(os.getcwd())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = RTDETR("yolo11n.pt")
+    model = RTDETR("rtdetr-l.pt")
     logger.info("Loaded baseline model")
     logger.info("testing\n\nfindme\n\ntesting")
     model.train(
