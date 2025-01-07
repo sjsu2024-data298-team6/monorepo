@@ -11,7 +11,7 @@ import time
 from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
 import logging
 from preprocessor.dataset import *
-from aws_handler import SNSHandler
+from aws_handler import S3Handler, SNSHandler
 
 logger = logging.getLogger("sfdt_preprocessor")
 logging.basicConfig(
@@ -21,26 +21,8 @@ logging.basicConfig(
 )
 
 sqs = boto3.client("sqs", region_name="us-east-1")
-s3 = boto3.client("s3")
 sns = SNSHandler(logger=logger)
-
-
-def upload_to_s3(local_path, s3_path, zip_name="upload.zip"):
-    zip_path = os.path.join("/tmp", zip_name)  # Temporary path for the zip file
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(local_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                zipf.write(file_path, os.path.relpath(file_path, local_path))
-    logger.info(f"Zipped {local_path} to {zip_path}")
-
-    if GeneralKeys.DEPLOYMENT == "dev":
-        logger.info("Not uploading in dev env")
-        return
-    s3_key = os.path.join(s3_path, zip_name)
-
-    s3.upload_file(zip_path, GeneralKeys.S3_BUCKET_NAME, s3_key)
-    logger.info(f"Uploaded {zip_path} to s3://{GeneralKeys.S3_BUCKET_NAME}/{s3_key}")
+s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 
 
 def process_and_upload_dataset(url, dtype, model, names=None):
@@ -56,7 +38,7 @@ def process_and_upload_dataset(url, dtype, model, names=None):
         return
         # for dl_format in ROBOFLOW_SUPPORTED_DATASETS:
         #    dataset_dir = download_dataset_from_roboflow(url, dl_format, keys.ROBOFLOW_KEY)
-        #     upload_to_s3(dataset_dir, "dataset", zip_name=f"{dl_format}.zip")
+        #     s3.upload_zip_to_s3(dataset_dir, "dataset", zip_name=f"{dl_format}.zip")
 
     elif dtype == PreProcessorKeys.TYPE_ZIPFILE:
         logger.warning(f"{dtype} support in progress")
@@ -76,7 +58,9 @@ def process_and_upload_dataset(url, dtype, model, names=None):
 
         logger.info("Converting dataset to YOLO format")
         visdrone2yolo(dir_name, names)
-        upload_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip")
+        s3.upload_zip_to_s3(
+            dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip"
+        )
 
         splits = ["test", "train", "valid"]
         logger.info("Converting dataset to COCO format")
@@ -92,7 +76,9 @@ def process_and_upload_dataset(url, dtype, model, names=None):
                 shutil.move(str(file_path), str(dir_name / split))
             os.rmdir(dir_name / split / "images")
         os.remove(dir_name / "data.yaml")
-        upload_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip")
+        s3.upload_zip_to_s3(
+            dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip"
+        )
 
         os.remove("visdrone.zip")
         shutil.rmtree(dir_name)
