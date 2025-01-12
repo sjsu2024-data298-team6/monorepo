@@ -20,7 +20,13 @@ def train_main(logger_) -> str:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = RTDETR("rtdetr-l.pt")
     logger.info("Loaded baseline model")
-    logger.info("testing\n\nfindme\n\ntesting")
+    logger.info(
+        """
+                findme
+                multi line
+                findme
+                """
+    )
     model.train(
         data=cwd / "data/data.yaml",
         epochs=model_params.epochs,
