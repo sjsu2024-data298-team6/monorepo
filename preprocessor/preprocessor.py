@@ -24,9 +24,9 @@ sns = SNSHandler(logger=logger)
 s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 
 
-def process_and_upload_dataset(url, dtype, model, names=None):
+def process_and_upload_dataset(url, dtype, names=None):
     sns.send(
-        f"Training {model}",
+        f"Converting {dtype} dataset",
         f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
     if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
@@ -84,7 +84,7 @@ def process_and_upload_dataset(url, dtype, model, names=None):
         logger.info("Dataset conversions complete")
 
         sns.send(
-            f"Training {model}",
+            f"Converting {dtype} dataset",
             f"Converted dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\ndatasets location: {GeneralKeys.S3_BUCKET_NAME}/datasets/",
         )
 
@@ -211,7 +211,9 @@ def listen_to_sqs():
 
                 # Process the dataset
                 process_and_upload_dataset(
-                    url=url, dtype=dtype, names=names, model=model
+                    url=url,
+                    dtype=dtype,
+                    names=names,
                 )
                 trigger_training(model, params)
 
@@ -248,7 +250,6 @@ def run():
                 "bus",
                 "motor",
             ],
-            model=TrainerKeys.MODEL_YOLO,
         )
         # trigger_training(TrainerKeys.MODEL_YOLO, {})
     else:
