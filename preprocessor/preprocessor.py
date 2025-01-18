@@ -58,6 +58,26 @@ def process_and_upload_dataset(url, dtype, names=None):
         with open(dir_name / "data.yaml", "w") as fd:
             yaml.safe_dump(yaml_content, fd)
 
+        splits = ["test", "train", "valid"]
+        for split in splits:
+            labels_path = dir_name / split / "labels"
+            for f in labels_path.glob("*.txt"):
+                clean = []
+                with open(f, "r") as fd:
+                    lines = fd.read()
+                    lines = lines.strip()
+                    lines = lines.splitlines()
+                for line in lines:
+                    tmp = line.strip().split()
+                    if len(tmp) > 5:
+                        tmp = convert_mask_to_bbox(tmp)
+                        tmp = [str(t) for t in tmp]
+                    tmp = " ".join(tmp)
+                    clean.append(tmp)
+                clean = "\n".join(clean)
+                with open(f, "w") as fd:
+                    fd.write(clean)
+
         s3.upload_zip_to_s3(
             dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip"
         )
