@@ -33,15 +33,53 @@ def process_and_upload_dataset(url, dtype, names=None):
         logger.warning(f"{dtype} download type not supported")
 
     if dtype == PreProcessorKeys.TYPE_ROBOFLOW:
-        logger.warning(f"{dtype} support in progress")
-        return
-        # for dl_format in ROBOFLOW_SUPPORTED_DATASETS:
-        #    dataset_dir = download_dataset_from_roboflow(url, dl_format, keys.ROBOFLOW_KEY)
-        #     s3.upload_zip_to_s3(dataset_dir, "dataset", zip_name=f"{dl_format}.zip")
+        if names is not None:
+            logger.warning(
+                "class names have been provided for roboflow dataset,"
+                + " however roboflow does not need them."
+                + " Provided class names will be discarded"
+            )
+
+        logger.info(f"Started download for roboflow dataset at {url}")
+        dir_name = download_dataset_from_roboflow(
+            url, PreProcessorKeys.ROBOFLOW_YOLOV11, PreProcessorKeys.ROBOFLOW_KEY
+        )
+        dir_name = Path(dir_name)
+        logger.info(f"Finished download of {url} to {dir_name}")
+        with open(dir_name / "data.yaml", "r") as fd:
+            yaml_content = yaml.safe_load(fd)
+            names = [name.lower() for name in yaml_content["names"]]
+            yaml_content["names"] = names
+
+        with open(dir_name / "data.yaml", "w") as fd:
+            yaml.safe_dump(yaml_content, fd)
+
+        s3.upload_zip_to_s3(
+            dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip"
+        )
+
+        splits = ["test", "train", "valid"]
+        logger.info("Converting dataset to COCO format")
+        for split in splits:
+            yolo_to_coco(
+                dir_name / split / "images",
+                dir_name / split / "labels",
+                dir_name / split / "images/_annotations.coco.json",
+                names,
+            )
+            shutil.rmtree(dir_name / split / "labels")
+            for file_path in (dir_name / split / "images").glob("*"):
+                shutil.move(str(file_path), str(dir_name / split))
+            os.rmdir(dir_name / split / "images")
+        os.remove(dir_name / "data.yaml")
+
+        s3.upload_zip_to_s3(
+            dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip"
+        )
+        shutil.rmtree(dir_name)
 
     elif dtype == PreProcessorKeys.TYPE_ZIPFILE:
         logger.warning(f"{dtype} support in progress")
-        return
 
     elif dtype == PreProcessorKeys.TYPE_VISDRONE:
         if names is None:
@@ -81,12 +119,13 @@ def process_and_upload_dataset(url, dtype, names=None):
 
         os.remove("visdrone.zip")
         shutil.rmtree(dir_name)
-        logger.info("Dataset conversions complete")
 
-        sns.send(
-            f"Converting {dtype} dataset",
-            f"Converted dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\ndatasets location: {GeneralKeys.S3_BUCKET_NAME}/datasets/",
-        )
+    logger.info("Dataset conversions complete")
+    sns.send(
+        f"Converting {dtype} dataset",
+        f"Converted dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\ndatasets location: {GeneralKeys.S3_BUCKET_NAME}/datasets/",
+    )
+    return
 
 
 def trigger_training(model, params):
@@ -235,21 +274,25 @@ def listen_to_sqs():
 
 def run():
     if GeneralKeys.DEPLOYMENT == "dev":
+        # process_and_upload_dataset(
+        #     "file:///mnt/d/datasets/VisDroneSmall.zip",
+        #     dtype=PreProcessorKeys.TYPE_VISDRONE,
+        #     names=[
+        #         "pedestrian",
+        #         "people",
+        #         "bicycle",
+        #         "car",
+        #         "van",
+        #         "truck",
+        #         "tricycle",
+        #         "awning-tricycle",
+        #         "bus",
+        #         "motor",
+        #     ],
+        # )
         process_and_upload_dataset(
-            "file:///mnt/d/datasets/VisDroneSmall.zip",
-            dtype=PreProcessorKeys.TYPE_VISDRONE,
-            names=[
-                "pedestrian",
-                "people",
-                "bicycle",
-                "car",
-                "van",
-                "truck",
-                "tricycle",
-                "awning-tricycle",
-                "bus",
-                "motor",
-            ],
+            "https://universe.roboflow.com/drone-obstacle-detection/drone-object-detection-yhpn6/dataset/15",
+            dtype=PreProcessorKeys.TYPE_ROBOFLOW,
         )
         # trigger_training(TrainerKeys.MODEL_YOLO, {})
     else:
