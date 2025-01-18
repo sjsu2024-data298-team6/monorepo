@@ -31,7 +31,11 @@ def process_and_upload_dataset(url, dtype, names=None):
     )
     if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
         logger.warning(f"{dtype} download type not supported")
+        return
 
+    dir_name = None
+
+    ### Create YOLO format of datasets
     if dtype == PreProcessorKeys.TYPE_ROBOFLOW:
         if names is not None:
             logger.warning(
@@ -58,29 +62,6 @@ def process_and_upload_dataset(url, dtype, names=None):
             dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip"
         )
 
-        splits = ["test", "train", "valid"]
-        logger.info("Converting dataset to COCO format")
-        for split in splits:
-            yolo_to_coco(
-                dir_name / split / "images",
-                dir_name / split / "labels",
-                dir_name / split / "images/_annotations.coco.json",
-                names,
-            )
-            shutil.rmtree(dir_name / split / "labels")
-            for file_path in (dir_name / split / "images").glob("*"):
-                shutil.move(str(file_path), str(dir_name / split))
-            os.rmdir(dir_name / split / "images")
-        os.remove(dir_name / "data.yaml")
-
-        s3.upload_zip_to_s3(
-            dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip"
-        )
-        shutil.rmtree(dir_name)
-
-    elif dtype == PreProcessorKeys.TYPE_ZIPFILE:
-        logger.warning(f"{dtype} support in progress")
-
     elif dtype == PreProcessorKeys.TYPE_VISDRONE:
         if names is None:
             logger.error("Names are required for visdrone")
@@ -99,26 +80,33 @@ def process_and_upload_dataset(url, dtype, names=None):
             dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip"
         )
 
-        splits = ["test", "train", "valid"]
-        logger.info("Converting dataset to COCO format")
-        for split in splits:
-            yolo_to_coco(
-                dir_name / split / "images",
-                dir_name / split / "labels",
-                dir_name / split / "images/_annotations.coco.json",
-                names,
-            )
-            shutil.rmtree(dir_name / split / "labels")
-            for file_path in (dir_name / split / "images").glob("*"):
-                shutil.move(str(file_path), str(dir_name / split))
-            os.rmdir(dir_name / split / "images")
-        os.remove(dir_name / "data.yaml")
-        s3.upload_zip_to_s3(
-            dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip"
-        )
-
         os.remove("visdrone.zip")
-        shutil.rmtree(dir_name)
+
+    ### Make sure stuff is working
+    try:
+        assert isinstance(dir_name, Path)
+        assert isinstance(names, list)
+    except AssertionError:
+        logger.error("Something went wrong converting to YOLO")
+        return
+
+    ### Convert to COCO format
+    splits = ["test", "train", "valid"]
+    logger.info("Converting dataset to COCO format")
+    for split in splits:
+        yolo_to_coco(
+            dir_name / split / "images",
+            dir_name / split / "labels",
+            dir_name / split / "images/_annotations.coco.json",
+            names,
+        )
+        shutil.rmtree(dir_name / split / "labels")
+        for file_path in (dir_name / split / "images").glob("*"):
+            shutil.move(str(file_path), str(dir_name / split))
+        os.rmdir(dir_name / split / "images")
+    os.remove(dir_name / "data.yaml")
+    s3.upload_zip_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip")
+    shutil.rmtree(dir_name)
 
     logger.info("Dataset conversions complete")
     sns.send(

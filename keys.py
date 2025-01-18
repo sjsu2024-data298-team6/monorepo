@@ -18,7 +18,6 @@ class PreProcessorKeys:
     TYPE_VISDRONE = "visdrone"
     SUPPORTED_TYPES = {
         TYPE_ROBOFLOW,
-        TYPE_ZIPFILE,
         TYPE_VISDRONE,
     }
 
