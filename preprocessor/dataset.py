@@ -77,6 +77,22 @@ def visdrone2yolo(dir: Path, names):
     shutil.rmtree(dir / "images")
 
 
+def convert_mask_to_bbox(line):
+    cls = float(line[0])
+    xarr = []
+    yarr = []
+    for i, p in enumerate(line[1:]):
+        if i % 2 == 0:
+            xarr.append(float(p))
+        else:
+            yarr.append(float(p))
+    xcenter = (max(xarr) + min(xarr)) / 2
+    ycenter = (max(yarr) + min(yarr)) / 2
+    bboxw = max(xarr) - min(xarr)
+    bboxh = max(yarr) - min(yarr)
+    return cls, xcenter, ycenter, bboxw, bboxh
+
+
 def yolo_to_coco(image_dir, label_dir, output_path, categories):
     coco_format = {
         "images": [],
@@ -117,9 +133,14 @@ def yolo_to_coco(image_dir, label_dir, output_path, categories):
 
         # Convert YOLO annotations to COCO format
         for line in label_lines:
-            class_id, x_center, y_center, bbox_width, bbox_height = map(
-                float, line.strip().split()
-            )
+            try:
+                class_id, x_center, y_center, bbox_width, bbox_height = map(
+                    float, line.strip().split()
+                )
+            except ValueError:
+                class_id, x_center, y_center, bbox_width, bbox_height = (
+                    convert_mask_to_bbox(line.strip().split())
+                )
 
             # Convert YOLO coordinates to COCO coordinates
             x = (x_center - bbox_width / 2) * width
