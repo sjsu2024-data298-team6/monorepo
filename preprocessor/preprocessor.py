@@ -243,12 +243,13 @@ def listen_to_sqs():
             message = response["Messages"][0]
             receipt_handle = message["ReceiptHandle"]
             body = ast.literal_eval(message["Body"])
+            data = body["data"]
             try:
-                url = body["url"]
-                dtype = body["dtype"]
-                model = body["model"]
-                params = body["params"]
-                names = body["names"]
+                url = data["url"]
+                dtype = data["dtype"]
+                model = data["model"]
+                params = data["params"]
+                names = data["names"]
 
                 # Delete message early to avoid over run model training
                 sqs.delete_message(
