@@ -282,6 +282,8 @@ def listen_to_sqs():
 
 
 def run():
+    sns.send("Preprocessor", "Preprocessor started/restarted")
+    logger.info("Preprocessor started/restarted")
     if GeneralKeys.DEPLOYMENT == "dev":
         # process_and_upload_dataset(
         #     "file:///mnt/d/datasets/VisDroneSmall.zip",
