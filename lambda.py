@@ -5,26 +5,15 @@ import ast
 
 sqs = boto3.client("sqs")
 
-QUEUE_URL = os.environ.get(
-    "SQS_QUEUE_URL"
-)
+QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
 
 
 def lambda_handler(event, context):
     try:
-        url = event.get("queryStringParameters", {}).get("url")
-        dtype = event.get("queryStringParameters", {}).get("dataset_type")
-        names = event.get("queryStringParameters", {}).get("names")
-        model = event.get("queryStringParameters", {}).get("model")
-        params = event.get("queryStringParameters", {}).get("params")
+        data = event.get("queryStringParameters", {}).get("data")
 
-        if not isinstance(params, dict):
-            params = json.loads(ast.literal_eval(params))
-
-        if not isinstance(names, list):
-            names = [x.strip() for x in names.split(",")]
-
-        print(type(url), type(dtype), type(names), type(model), type(params))
+        if not isinstance(data, dict):
+            data = json.loads(ast.literal_eval(data))
 
     except Exception as e:
         return {
@@ -35,15 +24,7 @@ def lambda_handler(event, context):
     try:
         response = sqs.send_message(
             QueueUrl=QUEUE_URL,
-            MessageBody=json.dumps(
-                {
-                    "url": url,
-                    "dtype": dtype,
-                    "names": names,
-                    "model": model,
-                    "params": params,
-                }
-            ),
+            MessageBody=json.dumps(data),
         )
 
         return {
