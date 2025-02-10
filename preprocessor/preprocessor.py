@@ -232,12 +232,12 @@ sudo shutdown -h now
     return instance_id
 
 
-def check_instance(instance_id):
+def check_instance_terminated(instance_id):
     ec2 = boto3.client("ec2", region_name="us-east-1")
     response = ec2.describe_instance_status(
         InstanceIds=[instance_id], IncludeAllInstances=True
     )
-    return response["InstanceStatuses"][0]["InstanceState"]
+    return response["InstanceStatuses"][0]["InstanceState"]["Name"] == "terminated"
 
 
 def listen_to_sqs():
@@ -277,6 +277,10 @@ def listen_to_sqs():
                 )
                 instance_id = trigger_training(model, params)
 
+                while not check_instance_terminated(instance_id):
+                    logger.info("Currently training...")
+                    time.sleep(30)
+
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
                 sns.send(
@@ -291,8 +295,6 @@ def listen_to_sqs():
                 logger.info("Deleted message from SQS with errors")
         else:
             logger.info("No messages in queue. Waiting...")
-        if instance_id is not None:
-            logger.info(f"{check_instance(instance_id)}")
         time.sleep(5)  # Poll every 5 seconds
 
 
