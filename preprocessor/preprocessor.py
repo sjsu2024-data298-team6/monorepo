@@ -248,7 +248,7 @@ def listen_to_sqs():
             data = body["data"]
             try:
                 url = data["url"]
-                dtype = data["dtype"]
+                dtype = data["datasetType"]
                 model = data["model"]
                 params = data["params"]
                 names = data["names"]
