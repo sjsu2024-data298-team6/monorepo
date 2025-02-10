@@ -8,6 +8,7 @@ import time
 import wget
 import zipfile
 import time
+import traceback
 from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
 import logging
 from preprocessor.dataset import *
@@ -271,7 +272,8 @@ def listen_to_sqs():
                 sns.send(
                     "Error | reading request",
                     f"""Project: pipeline
-                         Error: {e}""",
+                         Error: {e}
+                         Traceback: {traceback.format_exc()}""",
                 )
                 sqs.delete_message(
                     QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
