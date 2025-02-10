@@ -13,7 +13,7 @@ def lambda_handler(event, context):
         data = event.get("queryStringParameters", {}).get("data")
 
         if not isinstance(data, dict):
-            data = json.loads(ast.literal_eval(data))
+            data = json.loads(data)
 
     except Exception as e:
         return {
@@ -24,7 +24,7 @@ def lambda_handler(event, context):
     try:
         response = sqs.send_message(
             QueueUrl=QUEUE_URL,
-            MessageBody=json.dumps(data),
+            MessageBody=json.dumps({"data": data}),
         )
 
         return {
