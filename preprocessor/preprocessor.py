@@ -243,6 +243,7 @@ def listen_to_sqs():
             message = response["Messages"][0]
             receipt_handle = message["ReceiptHandle"]
             body = ast.literal_eval(message["Body"])
+            logger.info(f"{body}")
             data = body["data"]
             try:
                 url = data["url"]
