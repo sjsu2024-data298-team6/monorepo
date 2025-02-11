@@ -105,6 +105,7 @@ def process_and_upload_dataset(url, dtype, names=None):
 
     ### Make sure stuff is working
     try:
+        logger.info(f"{dir_name, names, type(dir_name), type(names)}")
         assert isinstance(dir_name, Path)
         assert isinstance(names, list)
     except AssertionError:
