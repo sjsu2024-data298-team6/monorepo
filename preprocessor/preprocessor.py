@@ -159,14 +159,16 @@ git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sj
 # setup environment
 cd /home/ubuntu/trainer
 echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train" >> .env
-echo '{json.dumps(params)}' >> params.json
+echo '{params}' >> params.json
 python3 -m venv venv
 source venv/bin/activate
 
 # install python packages and run
 pip install -r requirements.txt
+python3 main.py
 
 # exit
+sudo shutdown -h now
     """
 
     # Launch EC2 instance

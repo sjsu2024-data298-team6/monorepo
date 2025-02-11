@@ -2,9 +2,7 @@ import json
 
 with open("params.json", "r") as f:
     content = f.read()
-    print(content, type(content))
     raw_params = json.loads(content)
-    print(raw_params, type(raw_params))
 
 
 class yolo_params:
