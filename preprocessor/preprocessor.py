@@ -105,7 +105,6 @@ def process_and_upload_dataset(url, dtype, names=None):
 
     ### Make sure stuff is working
     try:
-        logger.info(f"{dir_name, names, type(dir_name), type(names)}")
         assert isinstance(dir_name, Path)
         assert isinstance(names, list)
     except AssertionError:
@@ -255,7 +254,6 @@ def listen_to_sqs():
             message = response["Messages"][0]
             receipt_handle = message["ReceiptHandle"]
             body = ast.literal_eval(message["Body"])
-            logger.info(f"{body}")
             data = body["data"]
             try:
                 url = data["url"]
@@ -279,6 +277,9 @@ def listen_to_sqs():
                     names=names,
                 )
                 instance_id = trigger_training(model, params)
+
+                # make sure instance id is available on api
+                time.sleep(60)
 
                 while not check_instance_terminated(instance_id):
                     logger.info("Currently training...")
@@ -304,7 +305,6 @@ def listen_to_sqs():
 def run():
     sns.send("Preprocessor", "Preprocessor started/restarted")
     logger.info("Preprocessor started/restarted")
-    logger.info(f"Started as {os.environ['USER']}")
 
     if GeneralKeys.DEPLOYMENT == "dev":
         # process_and_upload_dataset(
