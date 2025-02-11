@@ -263,6 +263,8 @@ def listen_to_sqs():
                 model = data["model"]
                 params = data["params"]
                 names = data["names"]
+                if type(names) == str:
+                    names = names.split(",")
 
                 # Delete message early to avoid over run model training
                 sqs.delete_message(
