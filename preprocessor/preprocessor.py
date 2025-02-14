@@ -334,11 +334,11 @@ def listen_to_sqs():
                 logger.info("Processed and deleted message from SQS.")
 
                 # Process the dataset
-                # process_and_upload_dataset(
-                #     url=url,
-                #     dtype=dtype,
-                #     names=names,
-                # )
+                process_and_upload_dataset(
+                    url=url,
+                    dtype=dtype,
+                    names=names,
+                )
                 instance_id = trigger_training(model, params)
 
                 # make sure instance id is available on api
