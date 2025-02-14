@@ -62,6 +62,15 @@ class S3Handler:
 
         return ret
 
+    def check_file_exists(self, key, logger=None):
+        if logger is not None:
+            logger.info(f"Checking if {key} exists in {self.bucket}")
+        try:
+            self.s3.head_object(Bucket=self.bucket, Key=key)
+            return True
+        except:
+            return False
+
     def download_file(self, key, name):
         if self.logger is not None:
             self.logger.info(

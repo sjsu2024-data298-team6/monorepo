@@ -34,6 +34,13 @@ def process_and_upload_dataset(url, dtype, names=None):
         logger.warning(f"{dtype} download type not supported")
         return
 
+    # check existing dataset
+    should_combine = False
+    if s3.check_file_exists(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", logger=logger):
+        logger.info(f"Dataset already exists in s3, combining with new dataset")
+        s3.download_file(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", "yolo_old.zip")
+        should_combine = True
+
     dir_name = None
 
     ### Create YOLO format of datasets
@@ -79,10 +86,6 @@ def process_and_upload_dataset(url, dtype, names=None):
                 with open(f, "w") as fd:
                     fd.write(clean)
 
-        s3.upload_zip_to_s3(
-            dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip"
-        )
-
     elif dtype == PreProcessorKeys.TYPE_VISDRONE:
         if names is None:
             logger.error("Names are required for visdrone")
@@ -97,9 +100,6 @@ def process_and_upload_dataset(url, dtype, names=None):
 
         logger.info("Converting dataset to YOLO format")
         visdrone2yolo(dir_name, names)
-        s3.upload_zip_to_s3(
-            dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip"
-        )
 
         os.remove("visdrone.zip")
 
@@ -110,6 +110,69 @@ def process_and_upload_dataset(url, dtype, names=None):
     except AssertionError:
         logger.error("Something went wrong converting to YOLO")
         return
+
+    if should_combine:
+        logger.info("Combining datasets")
+
+        with zipfile.ZipFile("yolo_old.zip", "r") as z:
+            z.extractall("old")
+        old_dir = Path("old")
+
+        with open(old_dir / "data.yaml", "r") as fd:
+            old_yaml = yaml.safe_load(fd)
+            old_names = old_yaml["names"]
+        with open(dir_name / "data.yaml", "r") as fd:
+            new_yaml = yaml.safe_load(fd)
+            new_names = new_yaml["names"]
+
+        combined_names = old_names
+        class_id_map = {}
+        for i, name in enumerate(new_names):
+            if name not in old_names:
+                combined_names.append(name)
+                class_id_map[str(i)] = str(len(combined_names) - 1)
+            else:
+                class_id_map[str(i)] = str(old_names.index(name))
+
+        with open(dir_name / "data.yaml", "w") as fd:
+            new_yaml["names"] = combined_names
+            new_yaml["nc"] = len(combined_names)
+            yaml.safe_dump(new_yaml, fd)
+
+        current_ts = int(time.time())
+        for split in ["test", "train", "valid"]:
+            for img_path in (dir_name / split / "images").glob("*"):
+                txt_path = dir_name / split / "labels" / (img_path.stem + ".txt")
+                with open(txt_path, "r") as fd:
+                    lines = fd.read().strip().splitlines()
+                new_lines = []
+                for line in lines:
+                    tmp = line.split()
+                    try:
+                        tmp[0] = class_id_map[tmp[0]]
+                    except KeyError:
+                        tmp[0] = class_id_map[str(int(float(tmp[0])))]
+                    new_lines.append(" ".join(tmp))
+                with open(txt_path, "w") as fd:
+                    fd.write("\n".join(new_lines))
+
+                # ts to avoid name conflicts
+                shutil.move(
+                    str(img_path),
+                    str(old_dir / split / "images" / f"{current_ts}_{img_path.name}"),
+                )
+                shutil.move(
+                    str(txt_path),
+                    str(old_dir / split / "labels" / f"{current_ts}_{txt_path.name}"),
+                )
+
+        shutil.rmtree(dir_name)
+        os.remove("yolo_old.zip")
+        dir_name = old_dir
+        logger.info("Finished combining datasets")
+
+    ### Zip and upload to s3
+    s3.upload_zip_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip")
 
     ### Convert to COCO format
     splits = ["test", "train", "valid"]
