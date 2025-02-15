@@ -141,7 +141,7 @@ def process_and_upload_dataset(url, dtype, names=None):
             else:
                 class_id_map[str(i)] = str(old_names.index(name))
 
-        with open(dir_name / "data.yaml", "w") as fd:
+        with open(old_dir / "data.yaml", "w") as fd:
             new_yaml["names"] = combined_names
             new_yaml["nc"] = len(combined_names)
             yaml.safe_dump(new_yaml, fd)
