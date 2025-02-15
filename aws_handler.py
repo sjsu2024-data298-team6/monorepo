@@ -35,6 +35,26 @@ class S3Handler:
         self.bucket = bucket
         self.s3 = boto3.client("s3")
 
+    def upload_file_to_s3(self, file_path, s3_path, file_name):
+        if GeneralKeys.DEPLOYMENT == "dev":
+            if self.logger is not None:
+                self.logger.info("Not uploading in dev env")
+            ret = ""
+        else:
+            s3_key = os.path.join(s3_path, file_name)
+
+            self.s3.upload_file(file_path, self.bucket, s3_key)
+            ret = f"Uploaded {file_path} to s3://{self.bucket}/{s3_key}"
+            if self.logger is not None:
+                self.logger.info(ret)
+
+        try:
+            os.remove(file_path)
+        except:
+            pass
+
+        return ret
+
     def upload_zip_to_s3(self, local_path, s3_path, zip_name="upload.zip"):
         zip_path = os.path.join("/tmp", zip_name)  # Temporary path for the zip file
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:

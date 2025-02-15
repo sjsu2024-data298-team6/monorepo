@@ -10,6 +10,7 @@ import zipfile
 import time
 import traceback
 from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
+import hashlib
 import logging
 from preprocessor.dataset import *
 from aws_handler import S3Handler, SNSHandler
@@ -111,6 +112,12 @@ def process_and_upload_dataset(url, dtype, names=None):
         logger.error("Something went wrong converting to YOLO")
         return
 
+    checksum_blob = []
+    if s3.check_file_exists("dataset/checksum_blob.txt", logger=logger):
+        s3.download_file("dataset/checksum_blob.txt", "checksum_blob.txt")
+        with open("checksum_blob.txt", "r") as fd:
+            checksum_blob = fd.read().splitlines()
+
     if should_combine:
         logger.info("Combining datasets")
 
@@ -140,8 +147,15 @@ def process_and_upload_dataset(url, dtype, names=None):
             yaml.safe_dump(new_yaml, fd)
 
         current_ts = int(time.time())
+        skipped = 0
         for split in ["test", "train", "valid"]:
             for img_path in (dir_name / split / "images").glob("*"):
+                img_checksum = hashlib.md5(img_path.read_bytes()).hexdigest()
+                if img_checksum in checksum_blob:
+                    skipped += 1
+                    continue
+                checksum_blob.append(img_checksum)
+
                 txt_path = dir_name / split / "labels" / (img_path.stem + ".txt")
                 with open(txt_path, "r") as fd:
                     lines = fd.read().strip().splitlines()
@@ -169,7 +183,18 @@ def process_and_upload_dataset(url, dtype, names=None):
         shutil.rmtree(dir_name)
         os.remove("yolo_old.zip")
         dir_name = old_dir
-        logger.info("Finished combining datasets")
+        logger.info(f"Finished combining datasets with {skipped} images skipped")
+
+    else:
+        for split in ["test", "train", "valid"]:
+            for img_path in (dir_name / split / "images").glob("*"):
+                img_checksum = hashlib.md5(img_path.read_bytes()).hexdigest()
+                checksum_blob.append(img_checksum)
+
+    with open("./checksum_blob.txt", "w") as fd:
+        fd.write("\n".join(checksum_blob))
+
+    s3.upload_file_to_s3("./checksum_blob.txt", "dataset", "checksum_blob.txt")
 
     ### Zip and upload to s3
     s3.upload_zip_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip")
