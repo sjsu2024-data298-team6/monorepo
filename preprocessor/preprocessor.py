@@ -331,6 +331,7 @@ def check_instance_terminated(instance_id):
 def listen_to_sqs():
     sqs = boto3.client("sqs", region_name="us-east-1")
     instance_id = None
+    _counter = 0
     while True:
         response = sqs.receive_message(
             QueueUrl=GeneralKeys.SQS_QUEUE_URL,
@@ -386,8 +387,11 @@ def listen_to_sqs():
                 )
                 logger.info("Deleted message from SQS with errors")
         else:
-            logger.info("No messages in queue. Waiting...")
+            if _counter == 360:
+                _counter = 0
+                logger.info("No messages in queue. Waiting...")
         time.sleep(5)  # Poll every 5 seconds
+        _counter += 1
 
 
 def run():
