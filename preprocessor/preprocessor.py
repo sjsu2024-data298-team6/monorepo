@@ -253,10 +253,6 @@ source venv/bin/activate
 
 # install python packages and run
 pip install -r requirements.txt
-python3 main.py
-
-# exit
-sudo shutdown -h now
     """
 
     # Launch EC2 instance
@@ -360,16 +356,16 @@ def listen_to_sqs():
                 logger.info("Processed and deleted message from SQS.")
 
                 # Process the dataset
-                process_and_upload_dataset(
-                    url=url,
-                    dtype=dtype,
-                    names=names,
-                )
+                # process_and_upload_dataset(
+                #     url=url,
+                #     dtype=dtype,
+                #     names=names,
+                # )
                 instance_id = trigger_training(model, params)
-                
+
                 # make sure instance id is available on api
                 time.sleep(60)
-                
+
                 while not check_instance_terminated(instance_id):
                     logger.info("Currently training...")
                     time.sleep(30)
