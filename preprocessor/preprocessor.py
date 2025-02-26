@@ -365,14 +365,14 @@ def listen_to_sqs():
                     dtype=dtype,
                     names=names,
                 )
-                # instance_id = trigger_training(model, params)
-                #
-                # # make sure instance id is available on api
-                # time.sleep(60)
-                #
-                # while not check_instance_terminated(instance_id):
-                #     logger.info("Currently training...")
-                #     time.sleep(30)
+                instance_id = trigger_training(model, params)
+                
+                # make sure instance id is available on api
+                time.sleep(60)
+                
+                while not check_instance_terminated(instance_id):
+                    logger.info("Currently training...")
+                    time.sleep(30)
 
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
