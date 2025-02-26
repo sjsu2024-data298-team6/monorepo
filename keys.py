@@ -8,6 +8,8 @@ class GeneralKeys:
     DEPLOYMENT = os.getenv("DEPLOYMENT")
     GITHUB_ACCESS_TOKEN = os.getenv("GITHUB_ACCESS_TOKEN")
     RUNNER = os.getenv("RUNNER")
+    WANDB_KEY = os.getenv("WANDB_KEY")
+    WANDB_ENTITY = os.getenv("WANDB_ENTITY")
 
 
 class PreProcessorKeys:

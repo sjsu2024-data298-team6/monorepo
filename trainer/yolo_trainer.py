@@ -6,8 +6,14 @@ import os
 from pathlib import Path
 from trainer.params import yolo_params
 import logging
+import wandb
+from wandb.integration.ultralytics import add_wandb_callback
+from aws_handler import SNSHandler
+from keys import GeneralKeys, TrainerKeys
 
 logger = None
+wandb.login(key=GeneralKeys.WANDB_KEY)
+sns = SNSHandler()
 
 
 def train_main(logger_) -> str:
@@ -15,17 +21,35 @@ def train_main(logger_) -> str:
     assert isinstance(logger, logging.Logger)
     model_params = yolo_params()
     logger.info(f"Params: {model_params}")
+
+    project = "MSDA_Capstone_Project"
+    run = wandb.init(
+        project=project,
+        tags=[
+            TrainerKeys.MODEL_YOLO,
+            GeneralKeys.DEPLOYMENT,
+        ],
+        entity=GeneralKeys.WANDB_ENTITY,
+        config=model_params.__dict__,
+    )
+
+    logger.info(f"Detailed logs at: {run.url}")
+    sns.send(f"Training {TrainerKeys.MODEL_YOLO}", f"Detailed logs at: {run.url}")
+
     cwd = Path(os.getcwd())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = YOLO("yolo11n.pt")
+    add_wandb_callback(model)
     logger.info("Loaded baseline model")
+
     model.train(
         data=cwd / "data/data.yaml",
         epochs=model_params.epochs,
         imgsz=model_params.imgsz,
         batch=model_params.batch,
         device=device,
+        project=project,
     )
     logger.info("finished training")
 
@@ -35,7 +59,9 @@ def train_main(logger_) -> str:
     test_base = cwd / "data" / test_base
 
     logger.info("Started inference")
-    return get_inference(model, f"{cwd}/data/test")
+    inference_info = get_inference(model, f"{cwd}/data/test")
+    wandb.finish()
+    return inference_info
 
 
 def iou(boxA, boxB):
