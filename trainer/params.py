@@ -1,8 +1,11 @@
 import json
 
-with open("params.json", "r") as f:
-    content = f.read()
-    raw_params = json.loads(content)
+try:
+    with open("params.json", "r") as f:
+        content = f.read()
+        raw_params = json.loads(content)
+except FileNotFoundError:
+    raw_params = {}
 
 
 class yolo_params:
