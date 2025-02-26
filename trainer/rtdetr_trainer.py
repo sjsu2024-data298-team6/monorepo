@@ -39,7 +39,7 @@ def train_main(logger_) -> str:
     cwd = Path(os.getcwd())
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = YOLO("yolo11n.pt")
+    model = RTDETR("rtdetr-l.pt")
     add_wandb_callback(model)
     logger.info("Loaded baseline model")
 
