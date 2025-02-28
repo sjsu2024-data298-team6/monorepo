@@ -27,7 +27,7 @@ def train_main(logger_, model_) -> Tuple[str, Path]:
     assert isinstance(logger, logging.Logger)
 
     project = "MSDA_Capstone_Project"
-    model_params = params_[model_]
+    model_params = params_[model_]()
     logger.info(f"Params: {model_params}")
     run = wandb.init(
         project=project,
