@@ -43,15 +43,16 @@ def download_dataset_from_s3(name):
 
 def train(model):
     logger.info(f"Started training for {model}")
-    if model == TrainerKeys.MODEL_YOLO:
-        from trainer.yolo_trainer import train_main
-    elif model == TrainerKeys.MODEL_RTDETR:
-        from trainer.rtdetr_trainer import train_main
+    if model in [
+        TrainerKeys.MODEL_YOLO,
+        TrainerKeys.MODEL_RTDETR,
+    ]:
+        from trainer.ultralytics_trainer import train_main
     else:
-        return "Model {model} not yet supported", False
+        return ("Model {model} not yet supported", None), False
 
     try:
-        return train_main(logger), True
+        return train_main(logger, model), True
     except Exception as e:
         return (
             f"Training of model '{model}' failed somewhere, please check manually\n\n\nExcpetion:\n{e}\n\n\nTraceback:\n{traceback.format_exc()}",
@@ -86,10 +87,12 @@ def run():
 
     time_start = time.time()
     model_results, success = train(model)
+    model_results, runs_dir = model_results
+
     time_taken = time.time() - time_start
     upload_message = ""
     if success:
-        upload_message = s3.upload_zip_to_s3("./runs", "runs/", f"{model}.zip")
+        upload_message = s3.upload_zip_to_s3(runs_dir, "runs/", f"{model}.zip")
     message = ["Training successful!" if success else "Training Failed!"]
     message.append(f"Runtime: {time_taken:.4f} seconds")
     message.append(upload_message)

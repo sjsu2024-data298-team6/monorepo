@@ -1,10 +1,11 @@
+from typing import Tuple
 import torch
 import yaml
-from ultralytics import RTDETR
+from ultralytics import YOLO, RTDETR
 import matplotlib.pyplot as plt
 import os
 from pathlib import Path
-from trainer.params import rtdetr_params
+from trainer.params import *
 import logging
 import wandb
 from wandb.integration.ultralytics import add_wandb_callback
@@ -15,18 +16,23 @@ logger = None
 wandb.login(key=GeneralKeys.WANDB_KEY)
 sns = SNSHandler()
 
+params_ = {
+    TrainerKeys.MODEL_YOLO: yolo_params,
+    TrainerKeys.MODEL_RTDETR: rtdetr_params,
+}
 
-def train_main(logger_) -> str:
+
+def train_main(logger_, model_) -> Tuple[str, Path]:
     logger = logger_
     assert isinstance(logger, logging.Logger)
-    model_params = rtdetr_params()
-    logger.info(f"Params: {model_params}")
 
     project = "MSDA_Capstone_Project"
+    model_params = params_[model_]
+    logger.info(f"Params: {model_params}")
     run = wandb.init(
         project=project,
         tags=[
-            TrainerKeys.MODEL_RTDETR,
+            model_,
             GeneralKeys.DEPLOYMENT,
         ],
         entity=GeneralKeys.WANDB_ENTITY,
@@ -34,12 +40,17 @@ def train_main(logger_) -> str:
     )
 
     logger.info(f"Detailed logs at: {run.url}")
-    sns.send(f"Training {TrainerKeys.MODEL_RTDETR}", f"Detailed logs at: {run.url}")
+    sns.send(f"Training {model_}", f"Detailed logs at: {run.url}")
+
+    if model_ == TrainerKeys.MODEL_YOLO:
+        model = YOLO("yolo11n.pt")
+    elif model_ == TrainerKeys.MODEL_RTDETR:
+        model = RTDETR("rtdetr-l.pt")
+    else:
+        raise Exception(f"Unsupported ultralytics model: {model_}")
 
     cwd = Path(os.getcwd())
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = RTDETR("rtdetr-l.pt")
     add_wandb_callback(model)
     logger.info("Loaded baseline model")
 
@@ -62,7 +73,7 @@ def train_main(logger_) -> str:
     logger.info("Started inference")
     inference_info = get_inference(model, f"{cwd}/data/test", runs_dir)
     wandb.finish()
-    return inference_info
+    return inference_info, runs_dir
 
 
 def iou(boxA, boxB):
