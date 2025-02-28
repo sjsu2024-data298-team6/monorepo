@@ -55,7 +55,10 @@ def train(model):
         return train_main(logger, model), True
     except Exception as e:
         return (
-            f"Training of model '{model}' failed somewhere, please check manually\n\n\nExcpetion:\n{e}\n\n\nTraceback:\n{traceback.format_exc()}",
+            (
+                f"Training of model '{model}' failed somewhere, please check manually\n\n\nExcpetion:\n{e}\n\n\nTraceback:\n{traceback.format_exc()}",
+                None,
+            ),
             False,
         )
 
@@ -86,8 +89,7 @@ def run():
     )
 
     time_start = time.time()
-    model_results, success = train(model)
-    model_results, runs_dir = model_results
+    (model_results, runs_dir), success = train(model)
 
     time_taken = time.time() - time_start
     upload_message = ""
