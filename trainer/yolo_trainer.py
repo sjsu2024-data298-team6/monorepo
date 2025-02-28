@@ -53,13 +53,14 @@ def train_main(logger_) -> str:
     )
     logger.info("finished training")
 
+    runs_dir = Path(project)
     with open(cwd / "data/data.yaml", "r") as file:
         yaml_content = yaml.safe_load(file)
     test_base = yaml_content["test"].split(".")[-1][1:]
     test_base = cwd / "data" / test_base
 
     logger.info("Started inference")
-    inference_info = get_inference(model, f"{cwd}/data/test")
+    inference_info = get_inference(model, f"{cwd}/data/test", runs_dir)
     wandb.finish()
     return inference_info
 
@@ -83,7 +84,7 @@ def iou(boxA, boxB):
     return iou
 
 
-def get_inference(model, test_base) -> str:
+def get_inference(model, test_base, runs_dir) -> str:
     label_path = f"{test_base}/labels"
     test_path = f"{test_base}/images"
 
@@ -148,6 +149,6 @@ def get_inference(model, test_base) -> str:
     results.append(f"Average inference time: {inference/len(pred)}")
     results = "\n".join(results)
 
-    with open("./runs/summary_results.txt", "w") as f:
+    with open(runs_dir / "summary_results.txt", "w") as f:
         f.write(results)
     return results
