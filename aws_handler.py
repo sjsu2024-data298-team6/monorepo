@@ -8,7 +8,8 @@ import os
 
 class SNSHandler:
     def __init__(self, region_name="us-east-1", logger=None):
-        assert isinstance(logger, logging.Logger)
+        if logger is not None:
+            assert isinstance(logger, logging.Logger)
         self.logger = logger
         self.sns = boto3.client("sns", region_name=region_name)
 
@@ -30,7 +31,8 @@ class SNSHandler:
 
 class S3Handler:
     def __init__(self, bucket, logger=None):
-        assert isinstance(logger, logging.Logger)
+        if logger is not None:
+            assert isinstance(logger, logging.Logger)
         self.logger = logger
         self.bucket = bucket
         self.s3 = boto3.client("s3")
