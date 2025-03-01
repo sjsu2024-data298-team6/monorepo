@@ -43,9 +43,9 @@ def train_main(logger_, model_) -> Tuple[str, Path]:
     sns.send(f"Training {model_}", f"Detailed logs at: {run.url}")
 
     if model_ == TrainerKeys.MODEL_YOLO:
-        model = YOLO("yolo11n.pt")
+        model = YOLO("yolo11n.yaml")
     elif model_ == TrainerKeys.MODEL_RTDETR:
-        model = RTDETR("rtdetr-l.pt")
+        model = RTDETR("rtdetr-l.yaml")
     else:
         raise Exception(f"Unsupported ultralytics model: {model_}")
 
