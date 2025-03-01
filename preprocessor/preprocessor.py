@@ -371,8 +371,11 @@ def listen_to_sqs():
                 time.sleep(60)
 
                 while not check_instance_terminated(instance_id):
-                    logger.info("Currently training...")
+                    if _counter == 360:
+                        _counter = 0
+                        logger.info("Currently training...")
                     time.sleep(30)
+                    _counter += 1
 
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
