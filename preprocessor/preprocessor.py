@@ -253,6 +253,10 @@ source venv/bin/activate
 
 # install python packages and run
 pip install -r requirements.txt
+python3 main.py
+
+# exit
+sudo shutdown -h now
     """
 
     # Launch EC2 instance
