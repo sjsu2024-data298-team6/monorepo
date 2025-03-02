@@ -11,6 +11,7 @@ QUEUE_URL = os.environ.get("SQS_QUEUE_URL")
 def lambda_handler(event, context):
     try:
         data = event.get("queryStringParameters", {}).get("data")
+        task = event.get("queryStringParameters", {}).get("task")
 
         if not isinstance(data, dict):
             data = json.loads(data)
@@ -24,7 +25,12 @@ def lambda_handler(event, context):
     try:
         response = sqs.send_message(
             QueueUrl=QUEUE_URL,
-            MessageBody=json.dumps({"data": data}),
+            MessageBody=json.dumps(
+                {
+                    "data": data,
+                    "task": task,
+                }
+            ),
         )
 
         return {
