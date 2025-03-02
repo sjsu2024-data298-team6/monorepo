@@ -344,38 +344,48 @@ def listen_to_sqs():
             receipt_handle = message["ReceiptHandle"]
             body = ast.literal_eval(message["Body"])
             data = body["data"]
+            task = body["task"]
             try:
-                url = data["url"]
-                dtype = data["datasetType"]
-                model = data["model"]
-                params = data["params"]
-                names = data["names"]
-                if type(names) == str:
-                    names = names.split(",")
-
                 # Delete message early to avoid over run model training
                 sqs.delete_message(
                     QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
                 )
                 logger.info("Processed and deleted message from SQS.")
+                ########################################################
+                if task == "model":
+                    model = data["model"]
+                    params = data["params"]
 
-                # Process the dataset
-                # process_and_upload_dataset(
-                #     url=url,
-                #     dtype=dtype,
-                #     names=names,
-                # )
-                instance_id = trigger_training(model, params)
+                    instance_id = trigger_training(model, params)
 
-                # make sure instance id is available on api
-                time.sleep(60)
+                    # make sure instance id is available on api
+                    time.sleep(60)
 
-                while not check_instance_terminated(instance_id):
-                    if _counter == 360:
-                        _counter = 0
-                        logger.info("Currently training...")
-                    time.sleep(30)
-                    _counter += 1
+                    while not check_instance_terminated(instance_id):
+                        if _counter == 360:
+                            _counter = 0
+                            logger.info("Currently training...")
+                        time.sleep(30)
+                        _counter += 1
+                    continue
+                ########################################################
+                elif task == "dataset":
+                    url = data["url"]
+                    dtype = data["datasetType"]
+                    names = data["names"]
+                    if type(names) == str:
+                        names = names.split(",")
+
+                    # Process the dataset
+                    process_and_upload_dataset(
+                        url=url,
+                        dtype=dtype,
+                        names=names,
+                    )
+                    continue
+                ########################################################
+                else:
+                    logger.warning(f"Task type {task} not supported")
 
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
