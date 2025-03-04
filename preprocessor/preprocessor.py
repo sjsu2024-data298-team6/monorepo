@@ -9,7 +9,7 @@ import wget
 import zipfile
 import time
 import traceback
-from keys import GeneralKeys, PreProcessorKeys, DatasetKeys
+from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
 import hashlib
 import logging
 from preprocessor.dataset import *
@@ -225,8 +225,14 @@ def process_and_upload_dataset(url, dtype, names=None):
     return
 
 
-def trigger_training(model, params):
+def trigger_training(model, params, data):
     ec2 = boto3.client("ec2", region_name="us-east-1")
+
+    extra_commands = []
+    if model == TrainerKeys.MODEL_YOLO_CUSTOM:
+        extra_commands.append(f"wget -O config.yaml {data['yaml_utkey']}")
+
+    extra_commands = "\n".join(extra_commands)
 
     # Define User Data script
     user_data_script = f"""#!/bin/bash
@@ -250,6 +256,8 @@ echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={Gen
 echo '{params}' >> params.json
 python3 -m venv venv
 source venv/bin/activate
+
+{extra_commands}
 
 # install python packages and run
 pip install -r requirements.txt
@@ -356,7 +364,7 @@ def listen_to_sqs():
                     model = data["model"]
                     params = data["params"]
 
-                    instance_id = trigger_training(model, params)
+                    instance_id = trigger_training(model, params, data)
 
                     # make sure instance id is available on api
                     time.sleep(60)
