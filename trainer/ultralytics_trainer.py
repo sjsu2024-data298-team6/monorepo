@@ -8,7 +8,6 @@ from pathlib import Path
 from trainer.params import *
 import logging
 import wandb
-from wandb.integration.ultralytics import add_wandb_callback
 from aws_handler import SNSHandler
 from keys import GeneralKeys, TrainerKeys
 
@@ -18,6 +17,7 @@ sns = SNSHandler()
 
 params_ = {
     TrainerKeys.MODEL_YOLO: yolo_params,
+    TrainerKeys.MODEL_YOLO_CUSTOM: yolo_params,
     TrainerKeys.MODEL_RTDETR: rtdetr_params,
 }
 
@@ -46,12 +46,14 @@ def train_main(logger_, model_) -> Tuple[str, Path]:
         model = YOLO("yolo11n.yaml")
     elif model_ == TrainerKeys.MODEL_RTDETR:
         model = RTDETR("rtdetr-l.yaml")
+    elif model_ == TrainerKeys.MODEL_YOLO_CUSTOM:
+        model = YOLO("./config.yaml")
     else:
         raise Exception(f"Unsupported ultralytics model: {model_}")
 
     cwd = Path(os.getcwd())
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    add_wandb_callback(model)
+    wandb.watch(model, log_freq=100, log_graph=True)
     logger.info("Loaded baseline model")
 
     model.train(

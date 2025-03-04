@@ -9,7 +9,7 @@ import wget
 import zipfile
 import time
 import traceback
-from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
+from keys import GeneralKeys, PreProcessorKeys, DatasetKeys
 import hashlib
 import logging
 from preprocessor.dataset import *

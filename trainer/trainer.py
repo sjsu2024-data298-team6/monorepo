@@ -46,6 +46,7 @@ def train(model):
     if model in [
         TrainerKeys.MODEL_YOLO,
         TrainerKeys.MODEL_RTDETR,
+        TrainerKeys.MODEL_YOLO_CUSTOM,
     ]:
         from trainer.ultralytics_trainer import train_main
     else:
@@ -68,6 +69,7 @@ def getDataset(model):
     if model in [
         TrainerKeys.MODEL_RTDETR,
         TrainerKeys.MODEL_YOLO,
+        TrainerKeys.MODEL_YOLO_CUSTOM,
     ]:
         dataset = DatasetKeys.YOLO_FORMAT
     return dataset
