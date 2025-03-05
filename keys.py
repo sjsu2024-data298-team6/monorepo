@@ -35,7 +35,7 @@ class PreProcessorKeys:
 class TrainerKeys:
     MODEL_YOLO = "yolo"
     MODEL_RTDETR = "rtdetr"
-    MODEL_YOLO_CUSTOM = "yolo_custom"
+    MODEL_YOLO_CUSTOM = "custom_yolo"
 
     SUPPORTED_MODELS = {
         MODEL_YOLO,
