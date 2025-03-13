@@ -1,7 +1,7 @@
 import json
 import boto3
 import os
-import ast
+import re
 
 sqs = boto3.client("sqs")
 
@@ -15,6 +15,14 @@ def lambda_handler(event, context):
 
         if not isinstance(data, dict):
             data = json.loads(data)
+
+        if "tags" in data.keys() and len(data["tags"]) > 0:
+            for tag in data["tags"]:
+                if re.search(r"[^A-Za-z0-9_-]", tag):
+                    return {
+                        "statusCode": 400,
+                        "body": json.dumps("Bad Request! Invalid characters in tags"),
+                    }
 
     except Exception as e:
         return {
