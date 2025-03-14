@@ -40,7 +40,7 @@ def train_main(logger_, model_, tags_) -> Tuple[str, Path]:
     sns.send(f"Training {model_}", f"Detailed logs at: {run.url}")
 
     if model_ == TrainerKeys.MODEL_YOLO:
-        model = YOLO("yolo11n.yaml")
+        model = YOLO("yolo11s.yaml")
     elif model_ == TrainerKeys.MODEL_RTDETR:
         model = RTDETR("rtdetr-l.yaml")
     elif model_ == TrainerKeys.MODEL_YOLO_CUSTOM:
