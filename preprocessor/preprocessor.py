@@ -271,66 +271,7 @@ python3 main.py
 # exit
 sudo shutdown -h now
     """
-
-    # Launch EC2 instance
-    response = ec2.run_instances(
-        ImageId="ami-015c62e8068dd8f78",
-        InstanceType="g5.2xlarge",
-        InstanceInitiatedShutdownBehavior="terminate",
-        KeyName="sjsu-fall24-data298-team6-key-pair",
-        MinCount=1,
-        MaxCount=1,
-        UserData=user_data_script,
-        IamInstanceProfile={
-            "Arn": os.getenv("EC2_INSTANCE_IAM_ARN"),
-        },
-        BlockDeviceMappings=[
-            {
-                "DeviceName": "/dev/sda1",
-                "Ebs": {
-                    "Encrypted": False,
-                    "DeleteOnTermination": True,
-                    "Iops": 3000,
-                    "SnapshotId": "snap-00618611224312cc9",
-                    "VolumeSize": 60,
-                    "VolumeType": "gp3",
-                    "Throughput": 125,
-                },
-            }
-        ],
-        NetworkInterfaces=[
-            {
-                "AssociatePublicIpAddress": True,
-                "DeviceIndex": 0,
-                "Groups": [
-                    "sg-0ae6a08ce3772678c",
-                ],
-            },
-        ],
-        TagSpecifications=[
-            {
-                "ResourceType": "instance",
-                "Tags": [
-                    {
-                        "Key": "Name",
-                        "Value": f"sfdt-trainer-{model}",
-                    },
-                    {
-                        "Key": "d298_task_type",
-                        "Value": "training",
-                    },
-                ],
-            },
-        ],
-    )
-
-    instance_id = response["Instances"][0]["InstanceId"]
-    logger.info(f"Trainer EC2 instance launched: {instance_id}")
-    sns.send(
-        f"Training {model}",
-        f"Trainer EC2 instance launched: {instance_id}",
-    )
-    return instance_id
+    logger.info(user_data_script)
 
 
 def check_instance_terminated(instance_id):
@@ -368,18 +309,7 @@ def listen_to_sqs():
                 if task == "model":
                     model = data["model"]
                     params = data["params"]
-
-                    instance_id = trigger_training(model, params, data)
-
-                    # make sure instance id is available on api
-                    time.sleep(60)
-
-                    while not check_instance_terminated(instance_id):
-                        if _counter == 360:
-                            _counter = 0
-                            logger.info("Currently training...")
-                        time.sleep(30)
-                        _counter += 1
+                    trigger_training(model, params, data)
                     continue
                 ########################################################
                 elif task == "dataset":
