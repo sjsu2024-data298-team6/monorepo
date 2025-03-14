@@ -22,7 +22,7 @@ params_ = {
 }
 
 
-def train_main(logger_, model_) -> Tuple[str, Path]:
+def train_main(logger_, model_, tags_) -> Tuple[str, Path]:
     logger = logger_
     assert isinstance(logger, logging.Logger)
 
@@ -31,10 +31,7 @@ def train_main(logger_, model_) -> Tuple[str, Path]:
     logger.info(f"Params: {model_params}")
     run = wandb.init(
         project=project,
-        tags=[
-            model_,
-            GeneralKeys.DEPLOYMENT,
-        ],
+        tags=tags_,
         entity=GeneralKeys.WANDB_ENTITY,
         config=model_params.__dict__,
     )

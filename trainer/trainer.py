@@ -41,7 +41,7 @@ def download_dataset_from_s3(name):
         z.extractall("data")
 
 
-def train(model):
+def train(model, tags):
     logger.info(f"Started training for {model}")
     if model in [
         TrainerKeys.MODEL_YOLO,
@@ -53,7 +53,7 @@ def train(model):
         return ("Model {model} not yet supported", None), False
 
     try:
-        return train_main(logger, model), True
+        return train_main(logger, model, tags), True
     except Exception as e:
         return (
             (
@@ -85,13 +85,21 @@ def run():
     if GeneralKeys.DEPLOYMENT != "dev":
         download_dataset_from_s3(f"{dataset}.zip")
 
+    tags = [model, GeneralKeys.DEPLOYMENT]
+    if "tags.txt" in os.listdir():
+        with open("tags.txt", "r") as fd:
+            tags.extend(fd.readlines())
+
     sns.send(
         f"Training {model}",
-        f"Model:{model}\nDataset:{dataset}\nStarted training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Model:{model}\n"
+        f"Dataset:{dataset}\n"
+        f"Tags:{tags}\n"
+        f"Started training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
 
     time_start = time.time()
-    (model_results, runs_dir), success = train(model)
+    (model_results, runs_dir), success = train(model, tags)
 
     time_taken = time.time() - time_start
     upload_message = ""

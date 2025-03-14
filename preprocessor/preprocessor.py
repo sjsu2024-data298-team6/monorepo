@@ -232,7 +232,12 @@ def trigger_training(model, params, data):
     if model == TrainerKeys.MODEL_YOLO_CUSTOM:
         extra_commands.append(f"wget -O config.yaml {data['yaml_utkey']}")
 
+    if "tags" in data.keys() and len(data["tags"]) > 0:
+        for tag in data["tags"]:
+            extra_commands.append(f'echo "{tag}" >> tags.txt')
+
     extra_commands = "\n".join(extra_commands)
+    logger.debug(extra_commands)
 
     # Define User Data script
     user_data_script = f"""#!/bin/bash
