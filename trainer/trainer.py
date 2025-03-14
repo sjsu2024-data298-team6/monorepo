@@ -85,10 +85,13 @@ def run():
     if GeneralKeys.DEPLOYMENT != "dev":
         download_dataset_from_s3(f"{dataset}.zip")
 
-    tags = [model, GeneralKeys.DEPLOYMENT]
+    tags = []
     if "tags.txt" in os.listdir():
         with open("tags.txt", "r") as fd:
             tags.extend(fd.readlines())
+    tags.append(model)
+    if "test" not in tags:
+        tags.append(GeneralKeys.DEPLOYMENT)
 
     sns.send(
         f"Training {model}",
