@@ -237,7 +237,7 @@ def trigger_training(model, params, data):
             extra_commands.append(f'echo "{tag}" >> tags.txt')
 
     extra_commands = "\n".join(extra_commands)
-    logger.debug(extra_commands)
+    logger.info(extra_commands)
 
     # Define User Data script
     user_data_script = f"""#!/bin/bash
