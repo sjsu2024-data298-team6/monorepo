@@ -231,10 +231,14 @@ def trigger_training(model, params, data):
     extra_commands = []
     if model == TrainerKeys.MODEL_YOLO_CUSTOM:
         extra_commands.append(f"wget -O config.yaml {data['yaml_utkey']}")
+        extra_commands.append(f"echo 'YAML_URL={data['yaml_url']}' >> .extra")
 
     if "tags" in data.keys() and len(data["tags"]) > 0:
         for tag in data["tags"]:
             extra_commands.append(f'echo "{tag}" >> tags.txt')
+
+    if "datasetId" in data.keys() and data["datasetId"] is not None:
+        extra_commands.append(f"echo 'DATASET_ID={data['datasetId']}' >> .extra")
 
     extra_commands = "\n".join(extra_commands)
 
@@ -256,7 +260,7 @@ git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sj
 
 # setup environment
 cd /home/ubuntu/trainer
-echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}" >> .env
+echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}\nDB_URI={GeneralKeys.DB_URI}" >> .env
 echo '{params}' >> params.json
 python3 -m venv venv
 source venv/bin/activate

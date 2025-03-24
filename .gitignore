@@ -157,3 +157,4 @@ cython_debug/
 .project_env
 .nvim.lua
 .todo
+.extra

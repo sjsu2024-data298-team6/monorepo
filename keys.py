@@ -10,6 +10,7 @@ class GeneralKeys:
     RUNNER = os.getenv("RUNNER")
     WANDB_KEY = os.getenv("WANDB_KEY")
     WANDB_ENTITY = os.getenv("WANDB_ENTITY")
+    DB_URI = os.getenv("DB_URI")
 
 
 class PreProcessorKeys:

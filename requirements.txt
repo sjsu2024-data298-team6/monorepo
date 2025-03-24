@@ -75,3 +75,5 @@ ultralytics-thop==2.0.14
 urllib3==2.2.3
 wandb==0.19.2
 wget==3.2
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.28
