@@ -8,6 +8,7 @@ import json
 from aws_handler import S3Handler, SNSHandler
 from db.queries import queries
 
+
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         log_entry = {
@@ -72,7 +73,6 @@ def getDefaultDataset(model):
     ]:
         dataset = DatasetKeys.YOLO_FORMAT
     dataset = f"dataset/{dataset}.zip"
-    download_dataset_from_s3(dataset)
     return dataset
 
 
@@ -93,13 +93,16 @@ def run():
     if "DATASET_ID" in extra_keys.keys():
         dataset_obj = queries().get_by_id(int(extra_keys["DATASET_ID"]))
         if dataset_obj is None:
-            logger.warning("Dataset ID provided, but no dataset found, using default dataset")
+            logger.warning(
+                "Dataset ID provided, but no dataset found, using default dataset"
+            )
             dataset = getDefaultDataset(model)
         else:
             dataset = dataset_obj.s3Key
     else:
         logger.warning("No dataset ID provided, using default dataset")
         dataset = getDefaultDataset(model)
+    download_dataset_from_s3(dataset)
 
     tags = []
     if "tags.txt" in os.listdir():
