@@ -93,14 +93,14 @@ def run():
     if "DATASET_ID" in extra_keys.keys():
         dataset_obj = queries().get_by_id(int(extra_keys["DATASET_ID"]))
         if dataset_obj is None:
-            logger.warning(
-                "Dataset ID provided, but no dataset found, using default dataset"
-            )
+            logger.warning("Dataset not found, using default dataset")
+            logger.warning("default dataset will be deprecated")
             dataset = getDefaultDataset(model)
         else:
             dataset = dataset_obj.s3Key
     else:
         logger.warning("No dataset ID provided, using default dataset")
+        logger.warning("default dataset will be deprecated")
         dataset = getDefaultDataset(model)
     download_dataset_from_s3(dataset)
 
