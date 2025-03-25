@@ -14,12 +14,15 @@ class QueryEngine:
         return self.db.query(Dataset).filter(Dataset.id == id).first()
 
     def get_model_by_key(self, key: str) -> Optional[Any]:
-        return (
+        model = (
             self.db.query(ModelBaseType)
             .filter(ModelBaseType.value == key)
             .filter(ModelBaseType.isActive == True)
             .first()
         )
+        if model is not None:
+            return model.id
+        return -1
 
 
 def queries() -> QueryEngine:

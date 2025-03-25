@@ -242,6 +242,9 @@ def trigger_training(model, params, data):
         extra_commands.append(f"echo 'DATASET_ID={data['datasetId']}' >> .extra")
 
     model_id = queries().get_model_by_key(model)
+    if model == -1:
+        return None
+
     extra_commands.append(f"echo 'MODEL_ID={model_id}' >> .extra")
 
     extra_commands = "\n".join(extra_commands)
@@ -377,6 +380,15 @@ def listen_to_sqs():
                     params = data["params"]
 
                     instance_id = trigger_training(model, params, data)
+                    if instance_id is None:
+                        logger.info("Model ID not found. Aborting")
+                        sns.send(
+                            "Error | Model ID not found",
+                            f"""Project: pipeline
+                            request body: {body}
+                            """,
+                        )
+                        continue
 
                     # make sure instance id is available on api
                     time.sleep(60)
