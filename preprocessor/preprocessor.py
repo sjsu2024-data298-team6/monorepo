@@ -14,6 +14,7 @@ import hashlib
 import logging
 from preprocessor.dataset import *
 from aws_handler import S3Handler, SNSHandler
+from db.queries import queries
 
 logger = logging.getLogger("sfdt_preprocessor")
 logging.basicConfig(
@@ -239,6 +240,9 @@ def trigger_training(model, params, data):
 
     if "datasetId" in data.keys() and data["datasetId"] is not None:
         extra_commands.append(f"echo 'DATASET_ID={data['datasetId']}' >> .extra")
+
+    model_id = queries().get_model_by_key(model)
+    extra_commands.append(f"echo 'MODEL_ID={model_id}' >> .extra")
 
     extra_commands = "\n".join(extra_commands)
 
