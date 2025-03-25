@@ -88,6 +88,8 @@ def run():
 
     model = os.getenv("MODEL_TO_TRAIN")
     if model is None:
+        logger.warning("Model not found, using default model")
+        logger.warning("default model will be deprecated")
         model = TrainerKeys.MODEL_YOLO
 
     if "DATASET_ID" in extra_keys.keys():
