@@ -83,7 +83,7 @@ def run():
         with open(".extra", "r") as fd:
             for line in fd.readlines():
                 key, value = line.split("=")
-                extra_keys[key] = value
+                extra_keys[key] = value.strip()
 
     model = os.getenv("MODEL_TO_TRAIN")
     if model is None:
