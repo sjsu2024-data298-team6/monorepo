@@ -41,7 +41,7 @@ def download_dataset_from_s3(s3_key):
         z.extractall("data")
 
 
-def train(model, tags):
+def train(model, extra_keys):
     logger.info(f"Started training for {model}")
     if model in [
         TrainerKeys.MODEL_YOLO,
@@ -53,7 +53,7 @@ def train(model, tags):
         return ("Model {model} not yet supported", None), False
 
     try:
-        return train_main(logger, model, tags), True
+        return train_main(logger, model, extra_keys), True
     except Exception as e:
         return (
             (
@@ -92,8 +92,18 @@ def run():
         logger.warning("default model will be deprecated")
         model = TrainerKeys.MODEL_YOLO
 
+    tags = []
+    if "tags.txt" in os.listdir():
+        with open("tags.txt", "r") as fd:
+            tags.extend(fd.readlines())
+    tags.append(model)
+    if "test" not in tags:
+        tags.append(GeneralKeys.DEPLOYMENT)
+
+    extra_keys["tags"] = tags
+
     if "DATASET_ID" in extra_keys.keys():
-        dataset_obj = queries().get_by_id(int(extra_keys["DATASET_ID"]))
+        dataset_obj = queries().get_dataset_by_id(int(extra_keys["DATASET_ID"]))
         if dataset_obj is None:
             logger.warning("Dataset not found, using default dataset")
             logger.warning("default dataset will be deprecated")
@@ -106,24 +116,16 @@ def run():
         dataset = getDefaultDataset(model)
     download_dataset_from_s3(dataset)
 
-    tags = []
-    if "tags.txt" in os.listdir():
-        with open("tags.txt", "r") as fd:
-            tags.extend(fd.readlines())
-    tags.append(model)
-    if "test" not in tags:
-        tags.append(GeneralKeys.DEPLOYMENT)
-
     sns.send(
         f"Training {model}",
         f"Model:{model}\n"
-        f"Dataset:{dataset}\n"
+        f"Dataset s3 key:{dataset}\n"
         f"Tags:{tags}\n"
         f"Started training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
 
     time_start = time.time()
-    (model_results, runs_dir), success = train(model, tags)
+    (model_results, runs_dir), success = train(model, extra_keys)
 
     time_taken = time.time() - time_start
     upload_message = ""
