@@ -158,3 +158,4 @@ cython_debug/
 .nvim.lua
 .todo
 .extra
+tags.txt
