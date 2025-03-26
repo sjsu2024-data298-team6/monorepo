@@ -74,8 +74,22 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
     wandb.finish()
 
     # hacky solution, fix later
-    with open("./wandb/latest-run/files/output.log", "r") as fd:
-        content = fd.readlines()
+    content = None
+
+    for encoding in ["utf-8", "latin-1", "ascii"]:
+        try:
+            with open(
+                "./wandb/latest-run/files/output.log", "r", encoding=encoding
+            ) as fd:
+                content = fd.readlines()
+            break
+        except UnicodeDecodeError:
+            continue
+
+    if content is None:
+        logger.error("Failed to read wandb output log with any encoding")
+        content = []
+
     idx = 0
     for i, line in enumerate(content):
         if "mAP50  mAP50-95" in line:
