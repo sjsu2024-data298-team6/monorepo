@@ -227,6 +227,10 @@ def process_and_upload_dataset(url, dtype, names=None):
 
 
 def trigger_training(model, params, data):
+    model_id = queries().get_model_by_key(model)
+    if model_id == -1:
+        return None
+
     ec2 = boto3.client("ec2", region_name="us-east-1")
 
     extra_commands = []
@@ -241,9 +245,6 @@ def trigger_training(model, params, data):
     if "datasetId" in data.keys() and data["datasetId"] is not None:
         extra_commands.append(f"echo 'DATASET_ID={data['datasetId']}' >> .extra")
 
-    model_id = queries().get_model_by_key(model)
-    if model == -1:
-        return None
 
     extra_commands.append(f"echo 'MODEL_ID={model_id}' >> .extra")
 
