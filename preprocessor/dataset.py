@@ -166,7 +166,7 @@ def yolo_to_coco(image_dir, label_dir, output_path, categories):
         json.dump(coco_format, f, indent=2)
 
 
-def download_dataset_from_roboflow(url, dl_format, key):
+def download_dataset_from_roboflow(url, dl_format, key, path=None):
     parts = url.split("/")
     ds_version = parts[-1]
     ds_project = parts[-3]
@@ -174,5 +174,6 @@ def download_dataset_from_roboflow(url, dl_format, key):
     rf = Roboflow(api_key=key)
     project = rf.workspace(ds_workspace).project(ds_project)
     version = project.version(ds_version)
-    dataset = version.download(dl_format, location=f"./{dl_format}", overwrite=True)
+    path = path or dl_format
+    dataset = version.download(dl_format, location=f"./{path}", overwrite=True)
     return Path(dataset.location)
