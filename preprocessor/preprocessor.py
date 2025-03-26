@@ -443,28 +443,4 @@ def listen_to_sqs():
 def run():
     sns.send("Preprocessor", "Preprocessor started/restarted")
     logger.info("Preprocessor started/restarted")
-
-    if GeneralKeys.DEPLOYMENT == "dev":
-        # process_and_upload_dataset(
-        #     "file:///mnt/d/datasets/VisDroneSmall.zip",
-        #     dtype=PreProcessorKeys.TYPE_VISDRONE,
-        #     names=[
-        #         "pedestrian",
-        #         "people",
-        #         "bicycle",
-        #         "car",
-        #         "van",
-        #         "truck",
-        #         "tricycle",
-        #         "awning-tricycle",
-        #         "bus",
-        #         "motor",
-        #     ],
-        # )
-        process_and_upload_dataset(
-            "https://universe.roboflow.com/drone-obstacle-detection/drone-object-detection-yhpn6/dataset/15",
-            dtype=PreProcessorKeys.TYPE_ROBOFLOW,
-        )
-        # trigger_training(TrainerKeys.MODEL_YOLO, {})
-    else:
-        listen_to_sqs()
+    listen_to_sqs()
