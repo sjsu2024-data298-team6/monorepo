@@ -94,7 +94,7 @@ def run():
     tags = []
     if "tags.txt" in os.listdir():
         with open("tags.txt", "r") as fd:
-            tags.extend(fd.readlines())
+            tags.extend([x.strip() for x in fd.readlines()])
     tags.append(model)
     if "test" not in tags:
         tags.append(GeneralKeys.DEPLOYMENT)
