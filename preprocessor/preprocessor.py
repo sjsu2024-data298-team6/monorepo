@@ -232,7 +232,7 @@ def trigger_training(model, params, data):
     extra_commands = []
     if model == TrainerKeys.MODEL_YOLO_CUSTOM:
         extra_commands.append(f"wget -O config.yaml {data['yaml_utkey']}")
-        extra_commands.append(f"echo 'YAML_URL={data['yaml_url']}' >> .extra")
+        extra_commands.append(f"echo 'YAML_URL={data['yaml_utkey']}' >> .extra")
 
     if "tags" in data.keys() and len(data["tags"]) > 0:
         for tag in data["tags"]:
