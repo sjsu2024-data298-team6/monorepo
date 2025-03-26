@@ -42,6 +42,7 @@ class S3Handler:
             if self.logger is not None:
                 self.logger.info("Not uploading in dev env")
             ret = ""
+            s3_key = "test.s3"
         else:
             s3_key = os.path.join(s3_path, file_name)
 
@@ -55,7 +56,7 @@ class S3Handler:
         except:
             pass
 
-        return ret
+        return ret, s3_key
 
     def upload_zip_to_s3(self, local_path, s3_path, zip_name="upload.zip"):
         zip_path = os.path.join("/tmp", zip_name)  # Temporary path for the zip file
@@ -69,6 +70,7 @@ class S3Handler:
             if self.logger is not None:
                 self.logger.info("Not uploading in dev env")
             ret = ""
+            s3_key = "test.s3"
         else:
             s3_key = os.path.join(s3_path, zip_name)
 
@@ -82,7 +84,7 @@ class S3Handler:
         except:
             pass
 
-        return ret
+        return ret, s3_key
 
     def check_file_exists(self, key, logger=None):
         if logger is not None:

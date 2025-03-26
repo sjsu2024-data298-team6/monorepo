@@ -7,6 +7,8 @@ import logging
 import json
 from aws_handler import S3Handler, SNSHandler
 from db.queries import queries
+from db.writer import DatabaseWriter
+from db import db_manager
 from preprocessor.dataset import download_dataset_from_roboflow
 
 
@@ -61,7 +63,7 @@ def train(model, extra_keys):
     ]:
         from trainer.ultralytics_trainer import train_main
     else:
-        return ("Model {model} not yet supported", None), False
+        return ("Model {model} not yet supported", None, None), False
 
     try:
         return train_main(logger, model, extra_keys), True
@@ -69,6 +71,7 @@ def train(model, extra_keys):
         return (
             (
                 f"Training of model '{model}' failed somewhere, please check manually\n\n\nExcpetion:\n{e}\n\n\nTraceback:\n{traceback.format_exc()}",
+                None,
                 None,
             ),
             False,
@@ -135,12 +138,51 @@ def run():
     )
 
     time_start = time.time()
-    (model_results, runs_dir), success = train(model, extra_keys)
+    (model_results, runs_dir, the_rest), success = train(model, extra_keys)
 
     time_taken = time.time() - time_start
     upload_message = ""
     if success:
-        upload_message = s3.upload_zip_to_s3(runs_dir, "runs/", f"{model}.zip")
+        assert the_rest is not None
+        assert runs_dir is not None
+        session = next(db_manager.get_db())
+        try:
+            results = model_results.splitlines()
+            inf = float(results[-1].split(":")[-1].strip())
+            iou = float(results[-2].split(":")[-1].strip())
+
+            ts = int(time.time())
+            upload_message, s3_key = s3.upload_zip_to_s3(
+                runs_dir, "runs/", f"{model}_{ts}.zip"
+            )
+            _, wt_key = s3.upload_file_to_s3(
+                the_rest["best_wt"], "runs/", f"{model}_{ts}_weights.pt"
+            )
+
+            extras = the_rest["extras"]
+            if "YAML_URL" in extra_keys.keys():
+                extras["YAML_URL"] = extra_keys["YAML_URL"]
+
+            writer = DatabaseWriter(session)
+            writer.create_model_result(
+                dataset_id=int(extra_keys["DATASET_ID"]),
+                model_type_id=int(extra_keys["MODEL_ID"]),
+                params=the_rest["params"],
+                extras=extras,
+                iou_score=iou,
+                inference_time=inf,
+                map50_score=the_rest["map50"],
+                map5095_score=the_rest["map5095"],
+                tags=tags,
+                model_s3_key=s3_key,
+                results_s3_key=wt_key,
+            )
+        except:
+            logger.info("Failed to upload results to database")
+            pass
+        finally:
+            session.close()
+
     message = ["Training successful!" if success else "Training Failed!"]
     message.append(f"Runtime: {time_taken:.4f} seconds")
     message.append(upload_message)

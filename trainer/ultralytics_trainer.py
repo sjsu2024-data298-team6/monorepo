@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Dict, Tuple
 import torch
 import yaml
 from ultralytics import YOLO, RTDETR
@@ -22,7 +22,7 @@ params_ = {
 }
 
 
-def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path]:
+def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
     logger = logger_
     assert isinstance(logger, logging.Logger)
 
@@ -72,7 +72,27 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path]:
     logger.info("Started inference")
     inference_info = get_inference(model, f"{cwd}/data/test", runs_dir)
     wandb.finish()
-    return inference_info, runs_dir
+
+    # hacky solution, fix later
+    with open("./wandb/latest-run/files/output.log", "r") as fd:
+        content = fd.readlines()
+    idx = 0
+    for i, line in enumerate(content):
+        if "mAP50  mAP50-95" in line:
+            idx = i + 1
+    mAPScores = content[idx].split()
+
+    return (
+        inference_info,
+        runs_dir,
+        {
+            "params": model_params.__dict__,
+            "extras": {"wandb_logs": run.url},
+            "best_wt": runs_dir / "train/weights/best.pt",
+            "map50": mAPScores[-2],
+            "map5095": mAPScores[-1],
+        },
+    )
 
 
 def iou(boxA, boxB):

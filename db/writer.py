@@ -1,0 +1,40 @@
+from typing import List, Optional, Dict, Any
+from sqlalchemy.orm import Session
+from .models import ModelResults
+
+
+class DatabaseWriter:
+    def __init__(self, session: Session):
+        self.session = session
+
+    def create_model_result(
+        self,
+        dataset_id: int,
+        model_type_id: int,
+        params: Dict[str, Any],
+        extras: Dict[str, Any],
+        iou_score: Optional[float],
+        map50_score: Optional[float],
+        map5095_score: Optional[float],
+        inference_time: Optional[float],
+        tags: List[str],
+        results_s3_key: str,
+        model_s3_key: str,
+    ) -> ModelResults:
+        model_result = ModelResults(
+            datasetId=dataset_id,
+            modelTypeId=model_type_id,
+            params=params,
+            extras=extras,
+            iouScore=iou_score,
+            map50Score=map50_score,
+            map5095Score=map5095_score,
+            inferenceTime=inference_time,
+            tags=tags,
+            resultsS3Key=results_s3_key,
+            modelS3Key=model_s3_key,
+        )
+        self.session.add(model_result)
+        self.session.commit()
+        return model_result
+
