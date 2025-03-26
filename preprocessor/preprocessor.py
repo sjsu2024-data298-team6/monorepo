@@ -249,6 +249,10 @@ def trigger_training(model, params, data):
 
     extra_commands = "\n".join(extra_commands)
 
+    shutdown = ""
+    if GeneralKeys.DEPLOYMENT != "dev":
+        shutdown = "python3 main.py\nsudo shutdown -h now"
+
     # Define User Data script
     user_data_script = f"""#!/bin/bash
 # update and install required packages
@@ -276,10 +280,7 @@ source venv/bin/activate
 
 # install python packages and run
 pip install -r requirements.txt
-python3 main.py
-
-# exit
-sudo shutdown -h now
+{shutdown}
     """
 
     # Launch EC2 instance
