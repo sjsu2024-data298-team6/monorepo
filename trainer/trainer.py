@@ -80,7 +80,6 @@ def run():
 
     extra_keys = {}
     if ".extra" in os.listdir():
-        print("extra")
         with open(".extra", "r") as fd:
             for line in fd.readlines():
                 key, value = line.split("=")
