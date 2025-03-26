@@ -1,12 +1,14 @@
+import shutil
 import zipfile
 import os
 import time
 import traceback
-from keys import GeneralKeys, TrainerKeys, DatasetKeys
+from keys import GeneralKeys, PreProcessorKeys, TrainerKeys, DatasetKeys
 import logging
 import json
 from aws_handler import S3Handler, SNSHandler
 from db.queries import queries
+from preprocessor.dataset import download_dataset_from_roboflow
 
 
 class JsonFormatter(logging.Formatter):
@@ -36,9 +38,19 @@ s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 
 
 def download_dataset_from_s3(s3_key):
-    s3.download_file(s3_key, "dataset.zip")
-    with zipfile.ZipFile("dataset.zip", "r") as z:
-        z.extractall("data")
+    if GeneralKeys.DEPLOYMENT == "dev":
+        # random tiny dataset for testing purposes
+        download_dataset_from_roboflow(
+            "https://universe.roboflow.com/box-irdnl/boxy-8ddct/dataset/2",
+            PreProcessorKeys.ROBOFLOW_YOLOV11,
+            PreProcessorKeys.ROBOFLOW_KEY,
+            path="data",
+        )
+        pass
+    else:
+        s3.download_file(s3_key, "dataset.zip")
+        with zipfile.ZipFile("dataset.zip", "r") as z:
+            z.extractall("data")
 
 
 def train(model, extra_keys):
