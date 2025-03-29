@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from .models import Dataset, ModelBaseType
+from .models import Dataset, DatasetBaseType, ModelBaseType
 from . import db_manager
 
 
@@ -12,6 +12,22 @@ class QueryEngine:
     def get_dataset_by_id(self, id: int) -> Optional[Any]:
         """Generic method to get a record by ID"""
         return self.db.query(Dataset).filter(Dataset.id == id).first()
+
+    def get_datasets(self) -> Optional[Any]:
+        datasets_raw = self.db.query(Dataset).all()
+        datasets = []
+        for dsr in datasets_raw:
+            dsr: Dataset
+            dsrdbt: DatasetBaseType = dsr.datasetType
+            datasets.append(
+                {
+                    "id": dsr.id,
+                    "s3key": dsr.s3Key,
+                    "tags": dsr.tags,
+                    "type": dsrdbt.name,
+                }
+            )
+        return datasets
 
     def get_model_by_key(self, key: str) -> Optional[Any]:
         model = (
