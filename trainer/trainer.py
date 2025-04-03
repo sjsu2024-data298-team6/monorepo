@@ -174,8 +174,8 @@ def run():
                 map50_score=the_rest["map50"],
                 map5095_score=the_rest["map5095"],
                 tags=tags,
-                model_s3_key=s3_key,
-                results_s3_key=wt_key,
+                model_s3_key=wt_key,
+                results_s3_key=s3_key,
             )
         except:
             logger.info("Failed to upload results to database")
