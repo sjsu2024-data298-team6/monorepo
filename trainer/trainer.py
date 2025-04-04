@@ -60,6 +60,7 @@ def train(model, extra_keys):
         TrainerKeys.MODEL_YOLO,
         TrainerKeys.MODEL_RTDETR,
         TrainerKeys.MODEL_YOLO_CUSTOM,
+        TrainerKeys.MODEL_RTDETR_CUSTOM,
     ]:
         from trainer.ultralytics_trainer import train_main
     else:
@@ -84,6 +85,7 @@ def getDefaultDataset(model):
         TrainerKeys.MODEL_RTDETR,
         TrainerKeys.MODEL_YOLO,
         TrainerKeys.MODEL_YOLO_CUSTOM,
+        TrainerKeys.MODEL_RTDETR_CUSTOM,
     ]:
         dataset = DatasetKeys.YOLO_FORMAT
     dataset = f"dataset/{dataset}.zip"

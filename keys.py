@@ -37,11 +37,13 @@ class TrainerKeys:
     MODEL_YOLO = "yolo"
     MODEL_RTDETR = "rtdetr"
     MODEL_YOLO_CUSTOM = "custom_yolo"
+    MODEL_RTDETR_CUSTOM = "custom_rtdetr"
 
     SUPPORTED_MODELS = {
         MODEL_YOLO,
         MODEL_RTDETR,
         MODEL_YOLO_CUSTOM,
+        MODEL_RTDETR_CUSTOM
     }
 
 
