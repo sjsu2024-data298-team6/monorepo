@@ -55,3 +55,5 @@ class ModelResults(Base):
     tags = Column(ARRAY(String), nullable=False)
     resultsS3Key = Column(String, nullable=False)
     modelS3Key = Column(String, nullable=False)
+    tfjsS3Key = Column(String, nullable=False)
+    isActive = Column(Boolean, nullable=False, default=True)
