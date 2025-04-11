@@ -99,13 +99,30 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
             idx = i + 1
     mAPScores = content[idx].split()
 
+    best_wt = runs_dir / "train/weights/best.pt"
+    tfjs_path = ""
+    if model_ in [TrainerKeys.MODEL_YOLO, TrainerKeys.MODEL_YOLO_CUSTOM]:
+        model = YOLO(best_wt)
+        logger.info("Starting model conversion to tfjs format")
+        try:
+            model.export(format="tfjs", half=True)
+            tfjs_path = f"{project}/train/weights/best_web_model"
+        except Exception as e:
+            logger.info(f"Failed to convert model to tfjs format: {e}")
+
+    ### RT-DETR is not supported by TFJS
+    # else:  # model_ in [TrainerKeys.MODEL_RTDETR, TrainerKeys.MODEL_RTDETR_CUSTOM]:
+    #     model = RTDETR(best_wt)
+    ###
+
     return (
         inference_info,
         runs_dir,
         {
             "params": model_params.__dict__,
             "extras": {"wandb_logs": run.url},
-            "best_wt": runs_dir / "train/weights/best.pt",
+            "best_wt": best_wt,
+            "tfjs_path": tfjs_path,
             "map50": mAPScores[-2],
             "map5095": mAPScores[-1],
         },
@@ -142,7 +159,6 @@ def get_inference(model, test_base, runs_dir) -> str:
     avg_iou_per_class = {name: 0 for _, name in names.items()}
 
     for idx, result in enumerate(pred):
-
         gt_boxes = []
         image_name = os.path.basename(result.path)
         img = plt.imread(result.path)  # Read the image to get its dimensions

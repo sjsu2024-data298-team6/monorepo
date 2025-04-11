@@ -1,3 +1,4 @@
+import shutil
 import zipfile
 import os
 import time
@@ -161,6 +162,13 @@ def run():
                 the_rest["best_wt"], "runs/", f"{model}_{ts}_weights.pt"
             )
 
+            tfjs_s3_key = ""
+            if the_rest["tfjs_path"] != "":
+                shutil.move(the_rest["tfjs_path"], f"{model}_{ts}_weights_tfjs")
+                _, tfjs_s3_key = s3.upload_folder_to_s3(
+                    f"{model}_{ts}_weights_tfjs", "tfjs_models"
+                )
+
             extras = the_rest["extras"]
             if "YAML_URL" in extra_keys.keys():
                 extras["YAML_URL"] = extra_keys["YAML_URL"]
@@ -178,6 +186,7 @@ def run():
                 tags=tags,
                 model_s3_key=wt_key,
                 results_s3_key=s3_key,
+                tfjs_s3_key=tfjs_s3_key,
             )
         except:
             logger.info("Failed to upload results to database")

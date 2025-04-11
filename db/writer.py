@@ -20,6 +20,7 @@ class DatabaseWriter:
         tags: List[str],
         results_s3_key: str,
         model_s3_key: str,
+        tfjs_s3_key: str,
     ) -> ModelResults:
         model_result = ModelResults(
             datasetId=dataset_id,
@@ -33,6 +34,7 @@ class DatabaseWriter:
             tags=tags,
             resultsS3Key=results_s3_key,
             modelS3Key=model_s3_key,
+            tfjsS3Key=tfjs_s3_key,
         )
         self.session.add(model_result)
         self.session.commit()

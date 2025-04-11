@@ -77,3 +77,13 @@ wandb==0.19.2
 wget==3.2
 psycopg2-binary==2.9.9
 SQLAlchemy==2.0.28
+onnx==1.17.0
+onnx2tf==1.26.3
+onnx_graphsurgeon==0.5.8
+onnxruntime-gpu==1.21.0
+onnxslim==0.1.50
+sng4onnx==1.0.4
+tensorflow==2.19.0
+tensorflowjs==4.22.0
+tf_keras==2.19.0
+tflite-support==0.4.4
