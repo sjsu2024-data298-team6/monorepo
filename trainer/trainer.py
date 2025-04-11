@@ -187,6 +187,7 @@ def run():
                 model_s3_key=wt_key,
                 results_s3_key=s3_key,
                 tfjs_s3_key=tfjs_s3_key,
+                is_active="test" not in tags
             )
         except:
             logger.info("Failed to upload results to database")
