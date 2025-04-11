@@ -160,3 +160,4 @@ cython_debug/
 .extra
 tags.txt
 tmp/
+yolov8s-custom.yaml
