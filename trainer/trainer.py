@@ -94,7 +94,6 @@ def getDefaultDataset(model):
 
 
 def run():
-
     extra_keys = {}
     if ".extra" in os.listdir():
         with open(".extra", "r") as fd:
@@ -134,10 +133,7 @@ def run():
 
     sns.send(
         f"Training {model}",
-        f"Model:{model}\n"
-        f"Dataset s3 key:{dataset}\n"
-        f"Tags:{tags}\n"
-        f"Started training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Model:{model}\nDataset s3 key:{dataset}\nTags:{tags}\nStarted training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
 
     time_start = time.time()
@@ -155,19 +151,13 @@ def run():
             iou = float(results[-2].split(":")[-1].strip())
 
             ts = int(time.time())
-            upload_message, s3_key = s3.upload_zip_to_s3(
-                runs_dir, "runs/", f"{model}_{ts}.zip"
-            )
-            _, wt_key = s3.upload_file_to_s3(
-                the_rest["best_wt"], "runs/", f"{model}_{ts}_weights.pt"
-            )
+            upload_message, s3_key = s3.upload_zip_to_s3(runs_dir, "runs/", f"{model}_{ts}.zip")
+            _, wt_key = s3.upload_file_to_s3(the_rest["best_wt"], "runs/", f"{model}_{ts}_weights.pt")
 
             tfjs_s3_key = ""
             if the_rest["tfjs_path"] != "":
                 shutil.move(the_rest["tfjs_path"], f"{model}_{ts}_weights_tfjs")
-                _, tfjs_s3_key = s3.upload_folder_to_s3(
-                    f"{model}_{ts}_weights_tfjs", "tfjs_models"
-                )
+                _, tfjs_s3_key = s3.upload_folder_to_s3(f"{model}_{ts}_weights_tfjs", "tfjs_models")
 
             extras = the_rest["extras"]
             if "YAML_URL" in extra_keys.keys():
@@ -187,7 +177,7 @@ def run():
                 model_s3_key=wt_key,
                 results_s3_key=s3_key,
                 tfjs_s3_key=tfjs_s3_key,
-                is_active="test" not in tags
+                is_active="test" not in tags,
             )
         except Exception as e:
             logger.info(f"Failed to upload results to database {e}")

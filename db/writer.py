@@ -36,9 +36,8 @@ class DatabaseWriter:
             resultsS3Key=results_s3_key,
             modelS3Key=model_s3_key,
             tfjsS3Key=tfjs_s3_key,
-            isActive=is_active
+            isActive=is_active,
         )
         self.session.add(model_result)
         self.session.commit()
         return model_result
-

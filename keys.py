@@ -43,7 +43,7 @@ class TrainerKeys:
         MODEL_YOLO,
         MODEL_RTDETR,
         MODEL_YOLO_CUSTOM,
-        MODEL_RTDETR_CUSTOM
+        MODEL_RTDETR_CUSTOM,
     }
 
 

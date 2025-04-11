@@ -17,11 +17,7 @@ from aws_handler import S3Handler, SNSHandler
 from db.queries import queries
 
 logger = logging.getLogger("sfdt_preprocessor")
-logging.basicConfig(
-    filename="sfdt_preprocessor.log",
-    encoding="utf-8",
-    level=logging.INFO,
-)
+logging.basicConfig(filename="sfdt_preprocessor.log", encoding="utf-8", level=logging.INFO)
 
 sns = SNSHandler(logger=logger)
 s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
@@ -29,8 +25,7 @@ s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 
 def process_and_upload_dataset(url, dtype, names=None):
     sns.send(
-        f"Converting {dtype} dataset",
-        f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Converting {dtype} dataset", f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}"
     )
     if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
         logger.warning(f"{dtype} download type not supported")
@@ -55,9 +50,7 @@ def process_and_upload_dataset(url, dtype, names=None):
             )
 
         logger.info(f"Started download for roboflow dataset at {url}")
-        dir_name = download_dataset_from_roboflow(
-            url, PreProcessorKeys.ROBOFLOW_YOLOV11, PreProcessorKeys.ROBOFLOW_KEY
-        )
+        dir_name = download_dataset_from_roboflow(url, PreProcessorKeys.ROBOFLOW_YOLOV11, PreProcessorKeys.ROBOFLOW_KEY)
         dir_name = Path(dir_name)
         logger.info(f"Finished download of {url} to {dir_name}")
         with open(dir_name / "data.yaml", "r") as fd:
@@ -172,14 +165,8 @@ def process_and_upload_dataset(url, dtype, names=None):
                     fd.write("\n".join(new_lines))
 
                 # ts to avoid name conflicts
-                shutil.move(
-                    str(img_path),
-                    str(old_dir / split / "images" / f"{current_ts}_{img_path.name}"),
-                )
-                shutil.move(
-                    str(txt_path),
-                    str(old_dir / split / "labels" / f"{current_ts}_{txt_path.name}"),
-                )
+                shutil.move(str(img_path), str(old_dir / split / "images" / f"{current_ts}_{img_path.name}"))
+                shutil.move(str(txt_path), str(old_dir / split / "labels" / f"{current_ts}_{txt_path.name}"))
 
         shutil.rmtree(dir_name)
         os.remove("yolo_old.zip")
@@ -245,7 +232,6 @@ def trigger_training(model, params, data):
     if "datasetId" in data.keys() and data["datasetId"] is not None:
         extra_commands.append(f"echo 'DATASET_ID={data['datasetId']}' >> .extra")
 
-
     extra_commands.append(f"echo 'MODEL_ID={model_id}' >> .extra")
 
     extra_commands = "\n".join(extra_commands)
@@ -293,9 +279,7 @@ pip install -r requirements.txt
         MinCount=1,
         MaxCount=1,
         UserData=user_data_script,
-        IamInstanceProfile={
-            "Arn": os.getenv("EC2_INSTANCE_IAM_ARN"),
-        },
+        IamInstanceProfile={"Arn": os.getenv("EC2_INSTANCE_IAM_ARN")},
         BlockDeviceMappings=[
             {
                 "DeviceName": "/dev/sda1",
@@ -314,23 +298,15 @@ pip install -r requirements.txt
             {
                 "AssociatePublicIpAddress": True,
                 "DeviceIndex": 0,
-                "Groups": [
-                    "sg-0ae6a08ce3772678c",
-                ],
+                "Groups": ["sg-0ae6a08ce3772678c"],
             },
         ],
         TagSpecifications=[
             {
                 "ResourceType": "instance",
                 "Tags": [
-                    {
-                        "Key": "Name",
-                        "Value": f"sfdt-trainer-{model}",
-                    },
-                    {
-                        "Key": "d298_task_type",
-                        "Value": "training",
-                    },
+                    {"Key": "Name", "Value": f"sfdt-trainer-{model}"},
+                    {"Key": "d298_task_type", "Value": "training"},
                 ],
             },
         ],
@@ -338,18 +314,13 @@ pip install -r requirements.txt
 
     instance_id = response["Instances"][0]["InstanceId"]
     logger.info(f"Trainer EC2 instance launched: {instance_id}")
-    sns.send(
-        f"Training {model}",
-        f"Trainer EC2 instance launched: {instance_id}",
-    )
+    sns.send(f"Training {model}", f"Trainer EC2 instance launched: {instance_id}")
     return instance_id
 
 
 def check_instance_terminated(instance_id):
     ec2 = boto3.client("ec2", region_name="us-east-1")
-    response = ec2.describe_instance_status(
-        InstanceIds=[instance_id], IncludeAllInstances=True
-    )
+    response = ec2.describe_instance_status(InstanceIds=[instance_id], IncludeAllInstances=True)
     return response["InstanceStatuses"][0]["InstanceState"]["Name"] == "terminated"
 
 
@@ -358,11 +329,7 @@ def listen_to_sqs():
     instance_id = None
     _counter = 0
     while True:
-        response = sqs.receive_message(
-            QueueUrl=GeneralKeys.SQS_QUEUE_URL,
-            MaxNumberOfMessages=1,
-            WaitTimeSeconds=10,
-        )
+        response = sqs.receive_message(QueueUrl=GeneralKeys.SQS_QUEUE_URL, MaxNumberOfMessages=1, WaitTimeSeconds=10)
 
         if "Messages" in response:
             message = response["Messages"][0]
@@ -372,9 +339,7 @@ def listen_to_sqs():
             task = body["task"]
             try:
                 # Delete message early to avoid over run model training
-                sqs.delete_message(
-                    QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
-                )
+                sqs.delete_message(QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
                 logger.info("Processed and deleted message from SQS.")
                 ########################################################
                 if task == "model":
@@ -411,11 +376,7 @@ def listen_to_sqs():
                         names = names.split(",")
 
                     # Process the dataset
-                    process_and_upload_dataset(
-                        url=url,
-                        dtype=dtype,
-                        names=names,
-                    )
+                    process_and_upload_dataset(url=url, dtype=dtype, names=names)
                     continue
                 ########################################################
                 else:
@@ -429,9 +390,7 @@ def listen_to_sqs():
                          Error: {e}
                          Traceback: {traceback.format_exc()}""",
                 )
-                sqs.delete_message(
-                    QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
-                )
+                sqs.delete_message(QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
                 logger.info("Deleted message from SQS with errors")
         else:
             if _counter == 360:

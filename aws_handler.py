@@ -15,11 +15,7 @@ class SNSHandler:
 
     def send(self, subject, message):
         try:
-            self.sns.publish(
-                TargetArn=GeneralKeys.SNS_ARN,
-                Message=message,
-                Subject=subject,
-            )
+            self.sns.publish(TargetArn=GeneralKeys.SNS_ARN, Message=message, Subject=subject)
 
         except Exception as e:
             if self.logger is not None:
@@ -119,15 +115,11 @@ class S3Handler:
 
     def download_file(self, key, name):
         if self.logger is not None:
-            self.logger.info(
-                f"Downloading {key} from {self.bucket} to {os.getcwd()}/{name}"
-            )
+            self.logger.info(f"Downloading {key} from {self.bucket} to {os.getcwd()}/{name}")
         try:
             self.s3.download_file(self.bucket, key, name)
         except Exception as e:
             if self.logger is not None:
-                self.logger.error(
-                    f"Failed to download key {key} from {self.bucket} to {name}"
-                )
+                self.logger.error(f"Failed to download key {key} from {self.bucket} to {name}")
                 self.logger.debug(e)
                 self.logger.debug(traceback.format_exc())

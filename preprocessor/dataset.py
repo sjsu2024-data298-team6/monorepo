@@ -11,12 +11,7 @@ import yaml
 def convert_box_to_yolo(size, box):
     dw = 1.0 / size[0]
     dh = 1.0 / size[1]
-    return (
-        (box[0] + box[2] / 2) * dw,
-        (box[1] + box[3] / 2) * dh,
-        box[2] * dw,
-        box[3] * dh,
-    )
+    return ((box[0] + box[2] / 2) * dw, (box[1] + box[3] / 2) * dh, box[2] * dw, box[3] * dh)
 
 
 def visdrone2yolo(dir: Path, names):
@@ -31,12 +26,7 @@ def visdrone2yolo(dir: Path, names):
                 cls = int(row[5]) - 1
                 box = convert_box_to_yolo(img_size, tuple(map(int, row[:4])))
                 lines.append(f"{cls} {' '.join(f'{x:.6f}' for x in box)}\n")
-                with open(
-                    str(f).replace(
-                        f"{os.sep}annotations{os.sep}", f"{os.sep}labels{os.sep}"
-                    ),
-                    "w",
-                ) as fl:
+                with open(str(f).replace(f"{os.sep}annotations{os.sep}", f"{os.sep}labels{os.sep}"), "w") as fl:
                     fl.writelines(lines)  # write label.txt
 
     splits = ["test", "train", "valid"]
@@ -116,9 +106,7 @@ def yolo_to_coco(image_dir, label_dir, output_path, categories):
         width, height = img.size
 
         # Add image info to COCO format
-        coco_format["images"].append(
-            {"id": img_id, "file_name": img_name, "width": width, "height": height}
-        )
+        coco_format["images"].append({"id": img_id, "file_name": img_name, "width": width, "height": height})
 
         # Get corresponding label file
         label_name = os.path.splitext(img_name)[0] + ".txt"
@@ -134,13 +122,9 @@ def yolo_to_coco(image_dir, label_dir, output_path, categories):
         # Convert YOLO annotations to COCO format
         for line in label_lines:
             try:
-                class_id, x_center, y_center, bbox_width, bbox_height = map(
-                    float, line.strip().split()
-                )
+                class_id, x_center, y_center, bbox_width, bbox_height = map(float, line.strip().split())
             except ValueError:
-                class_id, x_center, y_center, bbox_width, bbox_height = (
-                    convert_mask_to_bbox(line.strip().split())
-                )
+                class_id, x_center, y_center, bbox_width, bbox_height = convert_mask_to_bbox(line.strip().split())
 
             # Convert YOLO coordinates to COCO coordinates
             x = (x_center - bbox_width / 2) * width

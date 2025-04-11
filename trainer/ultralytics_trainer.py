@@ -28,14 +28,9 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
     assert isinstance(logger, logging.Logger)
 
     project = "MSDA_Capstone_Project"
-    model_params = params_[model_]()
-    logger.info(f"Params: {model_params}")
-    run = wandb.init(
-        project=project,
-        tags=extra_keys_["tags"],
-        entity=GeneralKeys.WANDB_ENTITY,
-        config=model_params.__dict__,
-    )
+    params = params_[model_]()
+    logger.info(f"Params: {params}")
+    run = wandb.init(project=project, tags=extra_keys_["tags"], entity=GeneralKeys.WANDB_ENTITY, config=params.__dict__)
 
     logger.info(f"Detailed logs at: {run.url}")
     sns.send(f"Training {model_}", f"Detailed logs at: {run.url}")
@@ -58,9 +53,9 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
 
     model.train(
         data=cwd / "data/data.yaml",
-        epochs=model_params.epochs,
-        imgsz=model_params.imgsz,
-        batch=model_params.batch,
+        epochs=params.epochs,
+        imgsz=params.imgsz,
+        batch=params.batch,
         device=device,
         project=project,
     )
@@ -81,9 +76,7 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
 
     for encoding in ["utf-8", "latin-1", "ascii"]:
         try:
-            with open(
-                "./wandb/latest-run/files/output.log", "r", encoding=encoding
-            ) as fd:
+            with open("./wandb/latest-run/files/output.log", "r", encoding=encoding) as fd:
                 content = fd.readlines()
             break
         except UnicodeDecodeError:
@@ -119,7 +112,7 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
         inference_info,
         runs_dir,
         {
-            "params": model_params.__dict__,
+            "params": params.__dict__,
             "extras": {"wandb_logs": run.url},
             "best_wt": best_wt,
             "tfjs_path": tfjs_path,
@@ -199,9 +192,7 @@ def get_inference(model, test_base, runs_dir) -> str:
         results.append(f"{key} iou: {avg_iou}")
 
     try:
-        results.append(
-            f"Average IoU: {sum(avg_iou_per_class.values())/sum(num_per_class.values())}"
-        )
+        results.append(f"Average IoU: {sum(avg_iou_per_class.values()) / sum(num_per_class.values())}")
     except ZeroDivisionError:
         results.append("Average IoU: -1")
 
@@ -209,7 +200,7 @@ def get_inference(model, test_base, runs_dir) -> str:
     for idx, result in enumerate(pred):
         inference += result.speed["inference"]
 
-    results.append(f"Average inference time: {inference/len(pred)}")
+    results.append(f"Average inference time: {inference / len(pred)}")
     results = "\n".join(results)
 
     with open(runs_dir / "summary_results.txt", "w") as f:

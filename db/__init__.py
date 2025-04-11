@@ -19,7 +19,6 @@ class DatabaseManager:
 
     def __init__(self):
         if self._engine is None:
-
             self._engine = create_engine(
                 GeneralKeys.DB_URI,
                 poolclass=QueuePool,
@@ -30,9 +29,7 @@ class DatabaseManager:
             )
 
             # Create session factory
-            self._SessionLocal = sessionmaker(
-                autocommit=False, autoflush=False, bind=self._engine
-            )
+            self._SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
 
     @property
     def engine(self):
@@ -47,4 +44,3 @@ class DatabaseManager:
 
 
 db_manager = DatabaseManager()
-
