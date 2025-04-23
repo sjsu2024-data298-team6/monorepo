@@ -266,6 +266,7 @@ source venv/bin/activate
 {extra_commands}
 
 # install python packages and run
+pip install git+https://github.com/sjsu2024-data298-team6/ultralytics.git
 pip install -r requirements.txt
 {shutdown}
     """
