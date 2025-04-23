@@ -161,3 +161,4 @@ cython_debug/
 tags.txt
 tmp/
 yolov8s-custom.yaml
+params.json
