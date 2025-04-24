@@ -1,9 +1,11 @@
-import boto3
-from keys import GeneralKeys
 import logging
+import os
 import traceback
 import zipfile
-import os
+
+import boto3
+
+from keys import GeneralKeys
 
 
 class SNSHandler:

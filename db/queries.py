@@ -1,8 +1,9 @@
-from typing import List, Optional, Dict, Any
+from typing import Any, Optional
+
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from .models import Dataset, ModelBaseType
+
 from . import db_manager
+from .models import Dataset, ModelBaseType
 
 
 class QueryEngine:
@@ -14,12 +15,7 @@ class QueryEngine:
         return self.db.query(Dataset).filter(Dataset.id == id).first()
 
     def get_model_by_key(self, key: str) -> Optional[Any]:
-        model = (
-            self.db.query(ModelBaseType)
-            .filter(ModelBaseType.value == key)
-            .filter(ModelBaseType.isActive == True)
-            .first()
-        )
+        model = self.db.query(ModelBaseType).filter(ModelBaseType.value == key).filter(ModelBaseType.isActive).first()
         if model is not None:
             return model.id
         return -1

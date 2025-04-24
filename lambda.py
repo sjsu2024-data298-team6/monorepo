@@ -1,7 +1,8 @@
 import json
-import boto3
 import os
 import re
+
+import boto3
 
 sqs = boto3.client("sqs")
 

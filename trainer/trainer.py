@@ -1,15 +1,16 @@
-import shutil
-import zipfile
+import json
+import logging
 import os
+import shutil
 import time
 import traceback
-from keys import GeneralKeys, PreProcessorKeys, TrainerKeys, DatasetKeys
-import logging
-import json
+import zipfile
+
 from aws_handler import S3Handler, SNSHandler
+from db import db_manager
 from db.queries import queries
 from db.writer import DatabaseWriter
-from db import db_manager
+from keys import DatasetKeys, GeneralKeys, PreProcessorKeys, TrainerKeys
 from preprocessor.dataset import download_dataset_from_roboflow
 
 

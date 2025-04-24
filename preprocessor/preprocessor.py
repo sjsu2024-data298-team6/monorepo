@@ -1,20 +1,26 @@
-from pathlib import Path
 import ast
-import boto3
-import json
+import hashlib
+import logging
 import os
 import shutil
 import time
-import wget
-import zipfile
-import time
 import traceback
-from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
-import hashlib
-import logging
-from preprocessor.dataset import *
+import zipfile
+from pathlib import Path
+
+import boto3
+import wget
+import yaml
+
 from aws_handler import S3Handler, SNSHandler
 from db.queries import queries
+from keys import DatasetKeys, GeneralKeys, PreProcessorKeys, TrainerKeys
+from preprocessor.dataset import (
+    convert_mask_to_bbox,
+    download_dataset_from_roboflow,
+    visdrone2yolo,
+    yolo_to_coco,
+)
 
 logger = logging.getLogger("sfdt_preprocessor")
 logging.basicConfig(filename="sfdt_preprocessor.log", encoding="utf-8", level=logging.INFO)
@@ -34,7 +40,7 @@ def process_and_upload_dataset(url, dtype, names=None):
     # check existing dataset
     should_combine = False
     if s3.check_file_exists(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", logger=logger):
-        logger.info(f"Dataset already exists in s3, combining with new dataset")
+        logger.info("Dataset already exists in s3, combining with new dataset")
         s3.download_file(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", "yolo_old.zip")
         should_combine = True
 
@@ -240,36 +246,40 @@ def trigger_training(model, params, data):
     if GeneralKeys.DEPLOYMENT != "dev":
         shutdown = "python3 main.py\nsudo shutdown -h now"
 
+    # fmt: off
     # Define User Data script
-    user_data_script = f"""#!/bin/bash
-# update and install required packages
-sudo apt update -y
-sudo apt upgrade -y
-sudo apt install python3-full python3-pip git amazon-ec2-utils libgl1 -y
-wget https://amazoncloudwatch-agent.s3.amazonaws.com/debian/amd64/latest/amazon-cloudwatch-agent.deb
-sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+    script = []
+    script.append("#!/bin/bash")
 
-# configure and start cloudwatch agent
-echo "{{\\"logs\\":{{\\"logs_collected\\":{{\\"files\\":{{\\"collect_list\\":[{{\\"file_path\\":\\"/home/ubuntu/trainer/sfdt_trainer.log\\",\\"log_group_name\\":\\"sfdt-log-group\\",\\"log_stream_name\\":\\"trainer/{model}/instance-$(ec2-metadata -i | awk '{{print $2}}')\\"}}]}}}}}}}}" | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null
-sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+    # update and install required packages
+    script.append("sudo apt update -y")
+    script.append("sudo apt upgrade -y")
+    script.append("sudo apt install python3-full python3-pip git amazon-ec2-utils libgl1 -y")
+    script.append("wget https://amazoncloudwatch-agent.s3.amazonaws.com/debian/amd64/latest/amazon-cloudwatch-agent.deb")
+    script.append("sudo dpkg -i -E ./amazon-cloudwatch-agent.deb")
 
-# get code
-git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer
+    # configure and start cloudwatch agent
+    script.append(f"""echo "{{\\"logs\\":{{\\"logs_collected\\":{{\\"files\\":{{\\"collect_list\\":[{{\\"file_path\\":\\"/home/ubuntu/trainer/sfdt_trainer.log\\",\\"log_group_name\\":\\"sfdt-log-group\\",\\"log_stream_name\\":\\"trainer/{model}/instance-$(ec2-metadata -i | awk '{{print $2}}')\\"}}]}}}}}}}}" | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null""")
+    script.append("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s")
 
-# setup environment
-cd /home/ubuntu/trainer
-echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}\nDB_URI={GeneralKeys.DB_URI}" >> .env
-echo '{params}' >> params.json
-python3 -m venv venv
-source venv/bin/activate
+    # get code
+    script.append(f"git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer")
 
-{extra_commands}
+    # setup environment
+    script.append("cd /home/ubuntu/trainer")
+    script.append(f'echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}\nDB_URI={GeneralKeys.DB_URI}" >> .env')
+    script.append(f"echo '{params}' >> params.json")
+    script.append("python3 -m venv venv")
+    script.append("source venv/bin/activate")
 
-# install python packages and run
-pip install git+https://github.com/sjsu2024-data298-team6/ultralytics.git
-pip install -r requirements.txt
-{shutdown}
-    """
+    script.append(f"{extra_commands}")
+
+    # install python packages and run
+    script.append("pip install git+https://github.com/sjsu2024-data298-team6/ultralytics.git")
+    script.append("pip install -r requirements.txt")
+    script.append(f"{shutdown}")
+    script = "\n".join(script)
+    # fmt: on
 
     # Launch EC2 instance
     response = ec2.run_instances(
@@ -279,7 +289,7 @@ pip install -r requirements.txt
         KeyName="sjsu-fall24-data298-team6-key-pair",
         MinCount=1,
         MaxCount=1,
-        UserData=user_data_script,
+        UserData=script,
         IamInstanceProfile={"Arn": os.getenv("EC2_INSTANCE_IAM_ARN")},
         BlockDeviceMappings=[
             {
@@ -373,7 +383,7 @@ def listen_to_sqs():
                     url = data["url"]
                     dtype = data["datasetType"]
                     names = data["names"]
-                    if type(names) == str:
+                    if type(names) is str:
                         names = names.split(",")
 
                     # Process the dataset

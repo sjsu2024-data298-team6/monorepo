@@ -1,7 +1,3 @@
-from dotenv import load_dotenv
-
-load_dotenv()
-
 from keys import GeneralKeys
 
 if GeneralKeys.RUNNER == "pre":

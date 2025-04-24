@@ -1,13 +1,15 @@
-from typing import Dict, Tuple
-import torch
-import yaml
-from ultralytics import YOLO, RTDETR
-import matplotlib.pyplot as plt
+import logging
 import os
 from pathlib import Path
-from trainer.params import *
-import logging
+from typing import Dict, Tuple
+
+import matplotlib.pyplot as plt
+import torch
 import wandb
+import yaml
+from ultralytics import RTDETR, YOLO
+
+import trainer.params as tparams
 from aws_handler import SNSHandler
 from keys import GeneralKeys, TrainerKeys
 
@@ -16,10 +18,10 @@ wandb.login(key=GeneralKeys.WANDB_KEY)
 sns = SNSHandler()
 
 params_ = {
-    TrainerKeys.MODEL_YOLO: yolo_params,
-    TrainerKeys.MODEL_YOLO_CUSTOM: yolo_params,
-    TrainerKeys.MODEL_RTDETR: rtdetr_params,
-    TrainerKeys.MODEL_RTDETR_CUSTOM: rtdetr_params,
+    TrainerKeys.MODEL_YOLO: tparams.yolo_params,
+    TrainerKeys.MODEL_YOLO_CUSTOM: tparams.yolo_params,
+    TrainerKeys.MODEL_RTDETR: tparams.rtdetr_params,
+    TrainerKeys.MODEL_RTDETR_CUSTOM: tparams.rtdetr_params,
 }
 
 
@@ -149,7 +151,7 @@ def get_inference(model, test_base, runs_dir) -> str:
     names = model.names
 
     num_per_class = {name: 0 for _, name in names.items()}
-    avg_iou_per_class = {name: 0 for _, name in names.items()}
+    avg_iou_per_class = {name: 0.0 for _, name in names.items()}
 
     for idx, result in enumerate(pred):
         gt_boxes = []

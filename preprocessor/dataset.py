@@ -1,11 +1,12 @@
-from PIL import Image
-from pathlib import Path
-from roboflow import Roboflow
 import json
 import os
 import random
 import shutil
+from pathlib import Path
+
 import yaml
+from PIL import Image
+from roboflow import Roboflow
 
 
 def convert_box_to_yolo(size, box):

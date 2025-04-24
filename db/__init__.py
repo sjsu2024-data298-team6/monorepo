@@ -1,7 +1,10 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import QueuePool
 from typing import Optional
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm.session import sessionmaker as sessionmaker_type
+from sqlalchemy.pool import QueuePool
+
 from keys import GeneralKeys
 
 Base = declarative_base()
@@ -18,6 +21,7 @@ class DatabaseManager:
         return cls._instance
 
     def __init__(self):
+        assert GeneralKeys.DB_URI is not None
         if self._engine is None:
             self._engine = create_engine(
                 GeneralKeys.DB_URI,
@@ -36,6 +40,7 @@ class DatabaseManager:
         return self._engine
 
     def get_db(self):
+        assert type(self._SessionLocal) is sessionmaker_type
         db = self._SessionLocal()
         try:
             yield db
