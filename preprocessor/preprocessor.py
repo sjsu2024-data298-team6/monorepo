@@ -283,7 +283,7 @@ def trigger_training(model, params, data):
 
     # Launch EC2 instance
     response = ec2.run_instances(
-        ImageId="ami-015c62e8068dd8f78",
+        ImageId="ami-093fcc54e22f8fcd4",
         InstanceType="g5.2xlarge",
         InstanceInitiatedShutdownBehavior="terminate",
         KeyName="sjsu-fall24-data298-team6-key-pair",
@@ -298,8 +298,8 @@ def trigger_training(model, params, data):
                     "Encrypted": False,
                     "DeleteOnTermination": True,
                     "Iops": 3000,
-                    "SnapshotId": "snap-00618611224312cc9",
-                    "VolumeSize": 60,
+                    "SnapshotId": "snap-0186871616ff60f9f",
+                    "VolumeSize": 200,
                     "VolumeType": "gp3",
                     "Throughput": 125,
                 },
