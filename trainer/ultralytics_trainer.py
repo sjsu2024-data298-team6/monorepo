@@ -96,7 +96,8 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
 
     best_wt = runs_dir / "train/weights/best.pt"
     tfjs_path = ""
-    if model_ in [TrainerKeys.MODEL_YOLO, TrainerKeys.MODEL_YOLO_CUSTOM]:
+    if model_ in [TrainerKeys.MODEL_YOLO_CUSTOM]:
+        # TrainerKeys.MODEL_YOLO not included as YOLOv11 is not supported yet
         model = YOLO(best_wt)
         logger.info("Starting model conversion to tfjs format")
         try:
