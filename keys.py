@@ -37,16 +37,65 @@ class PreProcessorKeys:
 
 
 class TrainerKeys:
-    MODEL_YOLO = "yolo"
-    MODEL_RTDETR = "rtdetr"
-    MODEL_YOLO_CUSTOM = "custom_yolo"
-    MODEL_RTDETR_CUSTOM = "custom_rtdetr"
+    YOLO_CUSTOM = "custom_yolo"
+    RTDETR_CUSTOM = "custom_rtdetr"
+    YOLOV8_BASE = "yolov8_base"
+    YOLOV11_BASE = "yolov11_base"
+    YOLOV8_DCE = "yolov8_dce"
+    YOLOV8_INVO = "yolov8_invo"
+    YOLOV8_MHSA = "yolov8_mhsa"
+    YOLOV8_RESNET_SINGLE = "yolov8_resnet_single"
+    YOLOV8_RESNET_DOUBLE = "yolov8_resnet_double"
+    YOLOV8_RESNET_ALT = "yolov8_resnet_alt"
+    YOLOV8_VIT_INVO = "yolov8_vit_invo"
+    RTDETR_BASE = "rtdetr_base"
 
     SUPPORTED_MODELS = {
-        MODEL_YOLO,
-        MODEL_RTDETR,
-        MODEL_YOLO_CUSTOM,
-        MODEL_RTDETR_CUSTOM,
+        YOLOV8_BASE,
+        YOLOV11_BASE,
+        YOLOV8_DCE,
+        YOLOV8_INVO,
+        YOLOV8_MHSA,
+        YOLOV8_RESNET_SINGLE,
+        YOLOV8_RESNET_DOUBLE,
+        YOLOV8_RESNET_ALT,
+        YOLOV8_VIT_INVO,
+        RTDETR_BASE,
+        YOLO_CUSTOM,
+        RTDETR_CUSTOM,
+    }
+
+    # TODO: Update in the future if this changes, might require code changes as well
+    ULTRALYTICS_TRAINER = SUPPORTED_MODELS.copy()
+    REQUIRE_YAML = SUPPORTED_MODELS.copy()
+
+    USE_RTDETR = {
+        YOLOV8_MHSA,
+        RTDETR_BASE,
+        RTDETR_CUSTOM,
+    }
+
+    USE_YOLO = {
+        YOLOV8_BASE,
+        YOLOV11_BASE,
+        YOLOV8_DCE,
+        YOLOV8_INVO,
+        YOLOV8_RESNET_SINGLE,
+        YOLOV8_RESNET_DOUBLE,
+        YOLOV8_RESNET_ALT,
+        YOLOV8_VIT_INVO,
+        YOLO_CUSTOM,
+    }
+
+    TFJS_SUPPORTED_YOLO_MODELS = {
+        YOLOV8_BASE,
+        YOLOV8_DCE,
+        YOLOV8_INVO,
+        YOLOV8_RESNET_SINGLE,
+        YOLOV8_RESNET_DOUBLE,
+        YOLOV8_RESNET_ALT,
+        YOLOV8_VIT_INVO,
+        YOLO_CUSTOM,
     }
 
 

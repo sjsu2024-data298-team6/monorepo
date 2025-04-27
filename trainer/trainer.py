@@ -58,12 +58,7 @@ def download_dataset_from_s3(s3_key):
 
 def train(model, extra_keys):
     logger.info(f"Started training for {model}")
-    if model in [
-        TrainerKeys.MODEL_YOLO,
-        TrainerKeys.MODEL_RTDETR,
-        TrainerKeys.MODEL_YOLO_CUSTOM,
-        TrainerKeys.MODEL_RTDETR_CUSTOM,
-    ]:
+    if model in TrainerKeys.ULTRALYTICS_TRAINER:
         from trainer.ultralytics_trainer import train_main
     else:
         return ("Model {model} not yet supported", None, None), False
@@ -83,12 +78,7 @@ def train(model, extra_keys):
 
 def getDefaultDataset(model):
     dataset = None
-    if model in [
-        TrainerKeys.MODEL_RTDETR,
-        TrainerKeys.MODEL_YOLO,
-        TrainerKeys.MODEL_YOLO_CUSTOM,
-        TrainerKeys.MODEL_RTDETR_CUSTOM,
-    ]:
+    if model in TrainerKeys.ULTRALYTICS_TRAINER:
         dataset = DatasetKeys.YOLO_FORMAT
     dataset = f"dataset/{dataset}.zip"
     return dataset
@@ -104,9 +94,9 @@ def run():
 
     model = os.getenv("MODEL_TO_TRAIN")
     if model is None:
-        logger.warning("Model not found, using default model")
-        logger.warning("default model will be deprecated")
-        model = TrainerKeys.MODEL_YOLO
+        logger.warning("Model not found")
+        sns.send("Training Failed", "Cannot train when model key is not provided. Trainer exited")
+        exit()
 
     tags = []
     if "tags.txt" in os.listdir():
