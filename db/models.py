@@ -42,6 +42,7 @@ class Dataset(Base):
     links = Column(ARRAY(String), nullable=False)
     tags = Column(ARRAY(String), nullable=False)
     modelResults = relationship("ModelResults", back_populates="dataset")
+    name = Column(String, default="")
 
 
 class ModelResults(Base):
