@@ -294,6 +294,8 @@ fi
         # install python packages and run
         script.append("pip install git+https://github.com/sjsu2024-data298-team6/ultralytics.git")
         script.append("pip install -r requirements.txt")
+        script.append("env > /home/ubuntu/env.log")
+        script.append(shutdown.replace("'", "'\\''"))
     script.append("'")
 
     script = "\n".join(script)
