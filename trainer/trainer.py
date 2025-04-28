@@ -11,7 +11,6 @@ from db import db_manager
 from db.queries import queries
 from db.writer import DatabaseWriter
 from keys import DatasetKeys, GeneralKeys, PreProcessorKeys, TrainerKeys
-from preprocessor.dataset import download_dataset_from_roboflow
 
 
 class JsonFormatter(logging.Formatter):
@@ -43,6 +42,8 @@ s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 def download_dataset_from_s3(s3_key):
     if GeneralKeys.DEPLOYMENT == "dev":
         # random tiny dataset for testing purposes
+        from preprocessor.dataset import download_dataset_from_roboflow
+
         download_dataset_from_roboflow(
             "https://universe.roboflow.com/box-irdnl/boxy-8ddct/dataset/2",
             PreProcessorKeys.ROBOFLOW_YOLOV11,
