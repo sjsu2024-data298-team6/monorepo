@@ -274,22 +274,28 @@ fi
     script.append(f"""echo "{{\\"logs\\":{{\\"logs_collected\\":{{\\"files\\":{{\\"collect_list\\":[{{\\"file_path\\":\\"/home/ubuntu/trainer/sfdt_trainer.log\\",\\"log_group_name\\":\\"sfdt-log-group\\",\\"log_stream_name\\":\\"trainer/{model}/instance-$(ec2-metadata -i | awk '{{print $2}}')\\"}}]}}}}}}}}" | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null""")
     script.append("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s")
 
-    # get code
-    script.append(f"git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer")
+    # switch user
+    script.append("su - ubuntu -c '")
+    if True: # creating logical indentation block for readability
+        script.append("export HOME=/home/ubuntu")
 
-    # setup environment
-    script.append("cd /home/ubuntu/trainer")
-    script.append(f'echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}\nDB_URI={GeneralKeys.DB_URI}" >> .env')
-    script.append(f"echo '{params}' >> params.json")
-    script.append("python3 -m venv venv")
-    script.append("source venv/bin/activate")
+        # get code
+        script.append(f"git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer")
 
-    script.append(f"{extra_commands}")
+        # setup environment
+        script.append("cd /home/ubuntu/trainer")
+        script.append(f'echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}\nDB_URI={GeneralKeys.DB_URI}" >> .env')
+        script.append(f'echo "{params}" >> params.json')
+        script.append("python3 -m venv venv")
+        script.append("source venv/bin/activate")
 
-    # install python packages and run
-    script.append("pip install git+https://github.com/sjsu2024-data298-team6/ultralytics.git")
-    script.append("pip install -r requirements.txt")
-    script.append(f"{shutdown}")
+        script.append(f"{extra_commands}")
+
+        # install python packages and run
+        script.append("pip install git+https://github.com/sjsu2024-data298-team6/ultralytics.git")
+        script.append("pip install -r requirements.txt")
+    script.append("'")
+
     script = "\n".join(script)
     # fmt: on
 
