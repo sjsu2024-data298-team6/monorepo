@@ -43,7 +43,7 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
     if model_ in TrainerKeys.USE_YOLO:
         model = YOLO("./yolov8s-custom.yaml")
     elif model_ in TrainerKeys.USE_RTDETR:
-        model = RTDETR("./yolov8s-custom.yaml")
+        model = RTDETR("./rtdetr-custom.yaml")
     else:
         raise Exception(f"Unsupported ultralytics model: {model_}")
 
