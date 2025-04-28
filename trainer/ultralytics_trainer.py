@@ -17,34 +17,33 @@ logger = None
 wandb.login(key=GeneralKeys.WANDB_KEY)
 sns = SNSHandler()
 
-params_ = {
-    TrainerKeys.MODEL_YOLO: tparams.yolo_params,
-    TrainerKeys.MODEL_YOLO_CUSTOM: tparams.yolo_params,
-    TrainerKeys.MODEL_RTDETR: tparams.rtdetr_params,
-    TrainerKeys.MODEL_RTDETR_CUSTOM: tparams.rtdetr_params,
-}
-
 
 def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
     logger = logger_
     assert isinstance(logger, logging.Logger)
 
     project = "MSDA_Capstone_Project"
-    params = params_[model_]()
+    params = None
+
+    if model_ in TrainerKeys.USE_YOLO:
+        params = tparams.yolo_params()
+    elif model_ in TrainerKeys.USE_RTDETR:
+        params = tparams.rtdetr_params()
+    else:
+        logger.warning("Something went wrong trying to check for model parameters")
+        sns.send("Training Failed", "Something went wrong trying to check for model parameters")
+        exit()
+
     logger.info(f"Params: {params}")
     run = wandb.init(project=project, tags=extra_keys_["tags"], entity=GeneralKeys.WANDB_ENTITY, config=params.__dict__)
 
     logger.info(f"Detailed logs at: {run.url}")
     sns.send(f"Training {model_}", f"Detailed logs at: {run.url}")
 
-    if model_ == TrainerKeys.MODEL_YOLO:
-        model = YOLO("yolo11s.yaml")
-    elif model_ == TrainerKeys.MODEL_RTDETR:
-        model = RTDETR("rtdetr-l.yaml")
-    elif model_ == TrainerKeys.MODEL_YOLO_CUSTOM:
+    if model_ in TrainerKeys.USE_YOLO:
         model = YOLO("./yolov8s-custom.yaml")
-    elif model_ == TrainerKeys.MODEL_RTDETR_CUSTOM:
-        model = RTDETR("./yolov8s-custom.yaml")
+    elif model_ in TrainerKeys.USE_RTDETR:
+        model = RTDETR("./rtdetr-custom.yaml")
     else:
         raise Exception(f"Unsupported ultralytics model: {model_}")
 
@@ -96,8 +95,7 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
 
     best_wt = runs_dir / "train/weights/best.pt"
     tfjs_path = ""
-    if model_ in [TrainerKeys.MODEL_YOLO_CUSTOM]:
-        # TrainerKeys.MODEL_YOLO not included as YOLOv11 is not supported yet
+    if model_ in TrainerKeys.TFJS_SUPPORTED_YOLO_MODELS:
         model = YOLO(best_wt)
         logger.info("Starting model conversion to tfjs format")
         try:
@@ -105,11 +103,8 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
             tfjs_path = f"{project}/train/weights/best_web_model"
         except Exception as e:
             logger.info(f"Failed to convert model to tfjs format: {e}")
-
-    ### RT-DETR is not supported by TFJS
-    # else:  # model_ in [TrainerKeys.MODEL_RTDETR, TrainerKeys.MODEL_RTDETR_CUSTOM]:
-    #     model = RTDETR(best_wt)
-    ###
+    else:
+        logger.info(f"{model_} does not support conversion to tfjs format")
 
     return (
         inference_info,

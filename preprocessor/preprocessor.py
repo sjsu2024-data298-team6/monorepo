@@ -227,8 +227,12 @@ def trigger_training(model, params, data):
     ec2 = boto3.client("ec2", region_name="us-east-1")
 
     extra_commands = []
-    if model in [TrainerKeys.MODEL_YOLO_CUSTOM, TrainerKeys.MODEL_RTDETR_CUSTOM]:
-        extra_commands.append(f"wget -O yolov8s-custom.yaml {data['yaml_utkey']}")
+    if model in TrainerKeys.REQUIRE_YAML:
+        if model in TrainerKeys.USE_YOLO:
+            extra_commands.append(f"wget -O yolov8s-custom.yaml {data['yaml_utkey']}")
+        elif model in TrainerKeys.USE_RTDETR:
+            extra_commands.append(f"wget -O rtdetr-custom.yaml {data['yaml_utkey']}")
+
         extra_commands.append(f"echo 'YAML_URL={data['yaml_utkey']}' >> .extra")
 
     if "tags" in data.keys() and len(data["tags"]) > 0:

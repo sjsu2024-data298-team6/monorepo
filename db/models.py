@@ -31,6 +31,7 @@ class ModelBaseType(Base):
     datasetType = relationship("DatasetBaseType", back_populates="modelBaseTypes")
     isActive = Column(Boolean, nullable=False, default=True)
     modelResults = relationship("ModelResults", back_populates="modelType")
+    yamlFile = Column(String, nullable=True)
 
 
 class Dataset(Base):
@@ -42,6 +43,7 @@ class Dataset(Base):
     links = Column(ARRAY(String), nullable=False)
     tags = Column(ARRAY(String), nullable=False)
     modelResults = relationship("ModelResults", back_populates="dataset")
+    name = Column(String, default="")
 
 
 class ModelResults(Base):
