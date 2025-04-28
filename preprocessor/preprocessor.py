@@ -361,6 +361,10 @@ def listen_to_sqs():
                     model = data["model"]
                     params = data["params"]
 
+                    if model not in TrainerKeys.SUPPORTED_MODELS:
+                        logger.info(f"Model {model} not supported currently")
+                        continue
+
                     instance_id = trigger_training(model, params, data)
                     if instance_id is None:
                         logger.info("Model ID not found. Aborting")
