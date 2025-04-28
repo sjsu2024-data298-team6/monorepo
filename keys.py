@@ -70,12 +70,12 @@ class TrainerKeys:
     REQUIRE_YAML = SUPPORTED_MODELS.copy()
 
     USE_RTDETR = {
-        YOLOV8_MHSA,
         RTDETR_BASE,
         RTDETR_CUSTOM,
     }
 
     USE_YOLO = {
+        YOLOV8_MHSA,
         YOLOV8_BASE,
         YOLOV11_BASE,
         YOLOV8_DCE,
@@ -88,6 +88,7 @@ class TrainerKeys:
     }
 
     TFJS_SUPPORTED_YOLO_MODELS = {
+        YOLOV8_MHSA,
         YOLOV8_BASE,
         YOLOV8_DCE,
         YOLOV8_INVO,
