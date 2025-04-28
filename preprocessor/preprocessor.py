@@ -248,7 +248,15 @@ def trigger_training(model, params, data):
 
     shutdown = ""
     if GeneralKeys.DEPLOYMENT != "dev":
-        shutdown = "python3 main.py\nsudo shutdown -h now"
+        shutdown = """
+python3 main.py > debug.log 2>&1
+if [ $? -ne 0 ]; then
+    echo "Training script failed with exit code $?" >> debug.log
+else
+    echo "Training script completed successfully" >> debug.log
+    sudo shutdown -h now
+fi
+"""
 
     # fmt: off
     # Define User Data script
