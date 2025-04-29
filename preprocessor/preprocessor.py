@@ -1,27 +1,29 @@
-from pathlib import Path
 import ast
-import boto3
-import json
+import hashlib
+import logging
 import os
 import shutil
 import time
-import wget
-import zipfile
-import time
 import traceback
-from keys import GeneralKeys, PreProcessorKeys, DatasetKeys, TrainerKeys
-import hashlib
-import logging
-from preprocessor.dataset import *
+import zipfile
+from pathlib import Path
+
+import boto3
+import wget
+import yaml
+
 from aws_handler import S3Handler, SNSHandler
 from db.queries import queries
+from keys import DatasetKeys, GeneralKeys, PreProcessorKeys, TrainerKeys
+from preprocessor.dataset import (
+    convert_mask_to_bbox,
+    download_dataset_from_roboflow,
+    visdrone2yolo,
+    yolo_to_coco,
+)
 
 logger = logging.getLogger("sfdt_preprocessor")
-logging.basicConfig(
-    filename="sfdt_preprocessor.log",
-    encoding="utf-8",
-    level=logging.INFO,
-)
+logging.basicConfig(filename="sfdt_preprocessor.log", encoding="utf-8", level=logging.INFO)
 
 sns = SNSHandler(logger=logger)
 s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
@@ -29,8 +31,7 @@ s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 
 def process_and_upload_dataset(url, dtype, names=None):
     sns.send(
-        f"Converting {dtype} dataset",
-        f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Converting {dtype} dataset", f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}"
     )
     if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
         logger.warning(f"{dtype} download type not supported")
@@ -39,7 +40,7 @@ def process_and_upload_dataset(url, dtype, names=None):
     # check existing dataset
     should_combine = False
     if s3.check_file_exists(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", logger=logger):
-        logger.info(f"Dataset already exists in s3, combining with new dataset")
+        logger.info("Dataset already exists in s3, combining with new dataset")
         s3.download_file(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", "yolo_old.zip")
         should_combine = True
 
@@ -55,9 +56,7 @@ def process_and_upload_dataset(url, dtype, names=None):
             )
 
         logger.info(f"Started download for roboflow dataset at {url}")
-        dir_name = download_dataset_from_roboflow(
-            url, PreProcessorKeys.ROBOFLOW_YOLOV11, PreProcessorKeys.ROBOFLOW_KEY
-        )
+        dir_name = download_dataset_from_roboflow(url, PreProcessorKeys.ROBOFLOW_YOLOV11, PreProcessorKeys.ROBOFLOW_KEY)
         dir_name = Path(dir_name)
         logger.info(f"Finished download of {url} to {dir_name}")
         with open(dir_name / "data.yaml", "r") as fd:
@@ -172,14 +171,8 @@ def process_and_upload_dataset(url, dtype, names=None):
                     fd.write("\n".join(new_lines))
 
                 # ts to avoid name conflicts
-                shutil.move(
-                    str(img_path),
-                    str(old_dir / split / "images" / f"{current_ts}_{img_path.name}"),
-                )
-                shutil.move(
-                    str(txt_path),
-                    str(old_dir / split / "labels" / f"{current_ts}_{txt_path.name}"),
-                )
+                shutil.move(str(img_path), str(old_dir / split / "images" / f"{current_ts}_{img_path.name}"))
+                shutil.move(str(txt_path), str(old_dir / split / "labels" / f"{current_ts}_{txt_path.name}"))
 
         shutil.rmtree(dir_name)
         os.remove("yolo_old.zip")
@@ -234,8 +227,12 @@ def trigger_training(model, params, data):
     ec2 = boto3.client("ec2", region_name="us-east-1")
 
     extra_commands = []
-    if model == TrainerKeys.MODEL_YOLO_CUSTOM:
-        extra_commands.append(f"wget -O config.yaml {data['yaml_utkey']}")
+    if model in TrainerKeys.REQUIRE_YAML:
+        if model in TrainerKeys.USE_YOLO:
+            extra_commands.append(f"wget -O yolov8s-custom.yaml {data['yaml_utkey']}")
+        elif model in TrainerKeys.USE_RTDETR:
+            extra_commands.append(f"wget -O rtdetr-custom.yaml {data['yaml_utkey']}")
+
         extra_commands.append(f"echo 'YAML_URL={data['yaml_utkey']}' >> .extra")
 
     if "tags" in data.keys() and len(data["tags"]) > 0:
@@ -245,57 +242,64 @@ def trigger_training(model, params, data):
     if "datasetId" in data.keys() and data["datasetId"] is not None:
         extra_commands.append(f"echo 'DATASET_ID={data['datasetId']}' >> .extra")
 
-
     extra_commands.append(f"echo 'MODEL_ID={model_id}' >> .extra")
 
     extra_commands = "\n".join(extra_commands)
 
-    shutdown = ""
-    if GeneralKeys.DEPLOYMENT != "dev":
-        shutdown = "python3 main.py\nsudo shutdown -h now"
-
+    # fmt: off
     # Define User Data script
-    user_data_script = f"""#!/bin/bash
-# update and install required packages
-sudo apt update -y
-sudo apt upgrade -y
-sudo apt install python3-full python3-pip git amazon-ec2-utils libgl1 -y
-wget https://amazoncloudwatch-agent.s3.amazonaws.com/debian/amd64/latest/amazon-cloudwatch-agent.deb
-sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
+    script = []
+    script.append("#!/bin/bash")
 
-# configure and start cloudwatch agent
-echo "{{\\"logs\\":{{\\"logs_collected\\":{{\\"files\\":{{\\"collect_list\\":[{{\\"file_path\\":\\"/home/ubuntu/trainer/sfdt_trainer.log\\",\\"log_group_name\\":\\"sfdt-log-group\\",\\"log_stream_name\\":\\"trainer/{model}/instance-$(ec2-metadata -i | awk '{{print $2}}')\\"}}]}}}}}}}}" | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null
-sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+    # update and install required packages
+    script.append("sudo apt update -y")
+    script.append("sudo apt upgrade -y")
+    script.append("sudo apt install python3-full python3-pip git amazon-ec2-utils libgl1 -y")
+    script.append("wget https://amazoncloudwatch-agent.s3.amazonaws.com/debian/amd64/latest/amazon-cloudwatch-agent.deb")
+    script.append("sudo dpkg -i -E ./amazon-cloudwatch-agent.deb")
 
-# get code
-git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer
+    # configure and start cloudwatch agent
+    script.append(f"""echo "{{\\"logs\\":{{\\"logs_collected\\":{{\\"files\\":{{\\"collect_list\\":[{{\\"file_path\\":\\"/home/ubuntu/trainer/sfdt_trainer.log\\",\\"log_group_name\\":\\"sfdt-log-group\\",\\"log_stream_name\\":\\"trainer/{model}/instance-$(ec2-metadata -i | awk '{{print $2}}')\\"}}]}}}}}}}}" | sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json > /dev/null""")
+    script.append("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s")
 
-# setup environment
-cd /home/ubuntu/trainer
-echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}\nDB_URI={GeneralKeys.DB_URI}" >> .env
-echo '{params}' >> params.json
-python3 -m venv venv
-source venv/bin/activate
+    # get code
+    script.append(f"git clone https://ibrahimmkhalid:{GeneralKeys.GITHUB_ACCESS_TOKEN}@github.com/sjsu2024-data298-team6/monorepo /home/ubuntu/trainer")
 
-{extra_commands}
+    # setup environment
+    script.append("cd /home/ubuntu/trainer")
+    script.append(f'echo "DEPLOYMENT=prod\nS3_BUCKET_NAME={GeneralKeys.S3_BUCKET_NAME}\nSNS_ARN={GeneralKeys.SNS_ARN}\nMODEL_TO_TRAIN={model}\nRUNNER=train\nWANDB_KEY={GeneralKeys.WANDB_KEY}\nWANDB_ENTITY={GeneralKeys.WANDB_ENTITY}\nDB_URI={GeneralKeys.DB_URI}" >> .env')
+    script.append(f"echo '{params}' >> params.json")
+    script.append("python3 -m venv venv")
+    script.append("source venv/bin/activate")
 
-# install python packages and run
-pip install -r requirements.txt
-{shutdown}
-    """
+    script.append(f"{extra_commands}")
+
+    # install python packages
+    script.append("pip install git+https://github.com/sjsu2024-data298-team6/ultralytics.git")
+    script.append("pip install -r requirements.txt")
+
+    # run script
+    script.append("python3 main.py >> sfdt_trainer.log 2>&1")
+    script.append("if [ $? -ne 0 ]; then")
+    script.append('    echo "Training script failed with exit code $?" >> sfdt_trainer.log')
+    script.append("else")
+    script.append('    echo "Training script completed successfully" >> sfdt_trainer.log')
+    script.append("    sudo shutdown -h now")
+    script.append("fi")
+
+    script = "\n".join(script)
+    # fmt: on
 
     # Launch EC2 instance
     response = ec2.run_instances(
-        ImageId="ami-015c62e8068dd8f78",
+        ImageId="ami-093fcc54e22f8fcd4",
         InstanceType="g5.2xlarge",
         InstanceInitiatedShutdownBehavior="terminate",
         KeyName="sjsu-fall24-data298-team6-key-pair",
         MinCount=1,
         MaxCount=1,
-        UserData=user_data_script,
-        IamInstanceProfile={
-            "Arn": os.getenv("EC2_INSTANCE_IAM_ARN"),
-        },
+        UserData=script,
+        IamInstanceProfile={"Arn": os.getenv("EC2_INSTANCE_IAM_ARN")},
         BlockDeviceMappings=[
             {
                 "DeviceName": "/dev/sda1",
@@ -303,8 +307,8 @@ pip install -r requirements.txt
                     "Encrypted": False,
                     "DeleteOnTermination": True,
                     "Iops": 3000,
-                    "SnapshotId": "snap-00618611224312cc9",
-                    "VolumeSize": 60,
+                    "SnapshotId": "snap-0186871616ff60f9f",
+                    "VolumeSize": 200,
                     "VolumeType": "gp3",
                     "Throughput": 125,
                 },
@@ -314,23 +318,15 @@ pip install -r requirements.txt
             {
                 "AssociatePublicIpAddress": True,
                 "DeviceIndex": 0,
-                "Groups": [
-                    "sg-0ae6a08ce3772678c",
-                ],
+                "Groups": ["sg-0ae6a08ce3772678c"],
             },
         ],
         TagSpecifications=[
             {
                 "ResourceType": "instance",
                 "Tags": [
-                    {
-                        "Key": "Name",
-                        "Value": f"sfdt-trainer-{model}",
-                    },
-                    {
-                        "Key": "d298_task_type",
-                        "Value": "training",
-                    },
+                    {"Key": "Name", "Value": f"sfdt-trainer-{model}"},
+                    {"Key": "d298_task_type", "Value": "training"},
                 ],
             },
         ],
@@ -338,18 +334,13 @@ pip install -r requirements.txt
 
     instance_id = response["Instances"][0]["InstanceId"]
     logger.info(f"Trainer EC2 instance launched: {instance_id}")
-    sns.send(
-        f"Training {model}",
-        f"Trainer EC2 instance launched: {instance_id}",
-    )
+    sns.send(f"Training {model}", f"Trainer EC2 instance launched: {instance_id}")
     return instance_id
 
 
 def check_instance_terminated(instance_id):
     ec2 = boto3.client("ec2", region_name="us-east-1")
-    response = ec2.describe_instance_status(
-        InstanceIds=[instance_id], IncludeAllInstances=True
-    )
+    response = ec2.describe_instance_status(InstanceIds=[instance_id], IncludeAllInstances=True)
     return response["InstanceStatuses"][0]["InstanceState"]["Name"] == "terminated"
 
 
@@ -358,11 +349,7 @@ def listen_to_sqs():
     instance_id = None
     _counter = 0
     while True:
-        response = sqs.receive_message(
-            QueueUrl=GeneralKeys.SQS_QUEUE_URL,
-            MaxNumberOfMessages=1,
-            WaitTimeSeconds=10,
-        )
+        response = sqs.receive_message(QueueUrl=GeneralKeys.SQS_QUEUE_URL, MaxNumberOfMessages=1, WaitTimeSeconds=10)
 
         if "Messages" in response:
             message = response["Messages"][0]
@@ -372,14 +359,16 @@ def listen_to_sqs():
             task = body["task"]
             try:
                 # Delete message early to avoid over run model training
-                sqs.delete_message(
-                    QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
-                )
+                sqs.delete_message(QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
                 logger.info("Processed and deleted message from SQS.")
                 ########################################################
                 if task == "model":
                     model = data["model"]
                     params = data["params"]
+
+                    if model not in TrainerKeys.SUPPORTED_MODELS:
+                        logger.info(f"Model {model} not supported currently")
+                        continue
 
                     instance_id = trigger_training(model, params, data)
                     if instance_id is None:
@@ -407,15 +396,11 @@ def listen_to_sqs():
                     url = data["url"]
                     dtype = data["datasetType"]
                     names = data["names"]
-                    if type(names) == str:
+                    if type(names) is str:
                         names = names.split(",")
 
                     # Process the dataset
-                    process_and_upload_dataset(
-                        url=url,
-                        dtype=dtype,
-                        names=names,
-                    )
+                    process_and_upload_dataset(url=url, dtype=dtype, names=names)
                     continue
                 ########################################################
                 else:
@@ -429,9 +414,7 @@ def listen_to_sqs():
                          Error: {e}
                          Traceback: {traceback.format_exc()}""",
                 )
-                sqs.delete_message(
-                    QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle
-                )
+                sqs.delete_message(QueueUrl=GeneralKeys.SQS_QUEUE_URL, ReceiptHandle=receipt_handle)
                 logger.info("Deleted message from SQS with errors")
         else:
             if _counter == 360:
@@ -442,6 +425,18 @@ def listen_to_sqs():
 
 
 def run():
+    if GeneralKeys.DEPLOYMENT == "dev":
+        model = "yolov8_base"
+        params = '{"epochs": 10, "imgsz": 640, "batch": 8}'
+        data = {
+            "params": params,
+            "model": "yolov8_base",
+            "yaml_utkey": "https://raw.githubusercontent.com/sjsu2024-data298-team6/ultralytics/9d0c4cadcce475aa5e143373a357a8da00729367/ultralytics/cfg/models/v8/yolov8.yaml",
+            "datasetId": 1,
+            "tags": ["test"],
+        }
+        print(trigger_training(model, params, data))
+        exit()
     sns.send("Preprocessor", "Preprocessor started/restarted")
     logger.info("Preprocessor started/restarted")
     listen_to_sqs()

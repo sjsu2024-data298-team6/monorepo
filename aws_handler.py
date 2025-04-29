@@ -1,9 +1,11 @@
-import boto3
-from keys import GeneralKeys
 import logging
+import os
 import traceback
 import zipfile
-import os
+
+import boto3
+
+from keys import GeneralKeys
 
 
 class SNSHandler:
@@ -15,11 +17,7 @@ class SNSHandler:
 
     def send(self, subject, message):
         try:
-            self.sns.publish(
-                TargetArn=GeneralKeys.SNS_ARN,
-                Message=message,
-                Subject=subject,
-            )
+            self.sns.publish(TargetArn=GeneralKeys.SNS_ARN, Message=message, Subject=subject)
 
         except Exception as e:
             if self.logger is not None:
@@ -36,6 +34,28 @@ class S3Handler:
         self.logger = logger
         self.bucket = bucket
         self.s3 = boto3.client("s3")
+
+    def upload_folder_to_s3(self, folder_path, s3_key):
+        if GeneralKeys.DEPLOYMENT == "dev":
+            if self.logger is not None:
+                self.logger.info("Not uploading in dev env")
+            ret = ""
+            s3_key = "test.s3"
+        else:
+            rets = []
+            s3_key = os.path.join(s3_key, folder_path)
+            for root, _, files in os.walk(folder_path):
+                for filename in files:
+                    local = os.path.join(root, filename)
+                    rel = os.path.relpath(local, folder_path)
+                    upload_ret, _ = self.upload_file_to_s3(local, s3_key, rel)
+                    rets.append(upload_ret)
+            rets = "\n".join(rets)
+            ret = f"Uploaded folder {folder_path} to s3://{self.bucket}/{s3_key}/\n\n{rets}"
+            if self.logger is not None:
+                self.logger.info(ret)
+
+        return ret, s3_key
 
     def upload_file_to_s3(self, file_path, s3_path, file_name):
         if GeneralKeys.DEPLOYMENT == "dev":
@@ -97,15 +117,11 @@ class S3Handler:
 
     def download_file(self, key, name):
         if self.logger is not None:
-            self.logger.info(
-                f"Downloading {key} from {self.bucket} to {os.getcwd()}/{name}"
-            )
+            self.logger.info(f"Downloading {key} from {self.bucket} to {os.getcwd()}/{name}")
         try:
             self.s3.download_file(self.bucket, key, name)
         except Exception as e:
             if self.logger is not None:
-                self.logger.error(
-                    f"Failed to download key {key} from {self.bucket} to {name}"
-                )
+                self.logger.error(f"Failed to download key {key} from {self.bucket} to {name}")
                 self.logger.debug(e)
                 self.logger.debug(traceback.format_exc())

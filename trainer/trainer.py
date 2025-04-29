@@ -1,15 +1,16 @@
-import zipfile
+import json
+import logging
 import os
+import shutil
 import time
 import traceback
-from keys import GeneralKeys, PreProcessorKeys, TrainerKeys, DatasetKeys
-import logging
-import json
+import zipfile
+
 from aws_handler import S3Handler, SNSHandler
+from db import db_manager
 from db.queries import queries
 from db.writer import DatabaseWriter
-from db import db_manager
-from preprocessor.dataset import download_dataset_from_roboflow
+from keys import DatasetKeys, GeneralKeys, PreProcessorKeys, TrainerKeys
 
 
 class JsonFormatter(logging.Formatter):
@@ -41,6 +42,8 @@ s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 def download_dataset_from_s3(s3_key):
     if GeneralKeys.DEPLOYMENT == "dev":
         # random tiny dataset for testing purposes
+        from preprocessor.dataset import download_dataset_from_roboflow
+
         download_dataset_from_roboflow(
             "https://universe.roboflow.com/box-irdnl/boxy-8ddct/dataset/2",
             PreProcessorKeys.ROBOFLOW_YOLOV11,
@@ -56,11 +59,7 @@ def download_dataset_from_s3(s3_key):
 
 def train(model, extra_keys):
     logger.info(f"Started training for {model}")
-    if model in [
-        TrainerKeys.MODEL_YOLO,
-        TrainerKeys.MODEL_RTDETR,
-        TrainerKeys.MODEL_YOLO_CUSTOM,
-    ]:
+    if model in TrainerKeys.ULTRALYTICS_TRAINER:
         from trainer.ultralytics_trainer import train_main
     else:
         return ("Model {model} not yet supported", None, None), False
@@ -80,18 +79,13 @@ def train(model, extra_keys):
 
 def getDefaultDataset(model):
     dataset = None
-    if model in [
-        TrainerKeys.MODEL_RTDETR,
-        TrainerKeys.MODEL_YOLO,
-        TrainerKeys.MODEL_YOLO_CUSTOM,
-    ]:
+    if model in TrainerKeys.ULTRALYTICS_TRAINER:
         dataset = DatasetKeys.YOLO_FORMAT
     dataset = f"dataset/{dataset}.zip"
     return dataset
 
 
 def run():
-
     extra_keys = {}
     if ".extra" in os.listdir():
         with open(".extra", "r") as fd:
@@ -101,9 +95,9 @@ def run():
 
     model = os.getenv("MODEL_TO_TRAIN")
     if model is None:
-        logger.warning("Model not found, using default model")
-        logger.warning("default model will be deprecated")
-        model = TrainerKeys.MODEL_YOLO
+        logger.warning("Model not found")
+        sns.send("Training Failed", "Cannot train when model key is not provided. Trainer exited")
+        exit()
 
     tags = []
     if "tags.txt" in os.listdir():
@@ -131,10 +125,7 @@ def run():
 
     sns.send(
         f"Training {model}",
-        f"Model:{model}\n"
-        f"Dataset s3 key:{dataset}\n"
-        f"Tags:{tags}\n"
-        f"Started training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Model:{model}\nDataset s3 key:{dataset}\nTags:{tags}\nStarted training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
     )
 
     time_start = time.time()
@@ -152,12 +143,13 @@ def run():
             iou = float(results[-2].split(":")[-1].strip())
 
             ts = int(time.time())
-            upload_message, s3_key = s3.upload_zip_to_s3(
-                runs_dir, "runs/", f"{model}_{ts}.zip"
-            )
-            _, wt_key = s3.upload_file_to_s3(
-                the_rest["best_wt"], "runs/", f"{model}_{ts}_weights.pt"
-            )
+            upload_message, s3_key = s3.upload_zip_to_s3(runs_dir, "runs/", f"{model}_{ts}.zip")
+            _, wt_key = s3.upload_file_to_s3(the_rest["best_wt"], "runs/", f"{model}_{ts}_weights.pt")
+
+            tfjs_s3_key = ""
+            if the_rest["tfjs_path"] != "":
+                shutil.move(the_rest["tfjs_path"], f"{model}_{ts}_weights_tfjs")
+                _, tfjs_s3_key = s3.upload_folder_to_s3(f"{model}_{ts}_weights_tfjs", "tfjs_models")
 
             extras = the_rest["extras"]
             if "YAML_URL" in extra_keys.keys():
@@ -174,11 +166,13 @@ def run():
                 map50_score=the_rest["map50"],
                 map5095_score=the_rest["map5095"],
                 tags=tags,
-                model_s3_key=s3_key,
-                results_s3_key=wt_key,
+                model_s3_key=wt_key,
+                results_s3_key=s3_key,
+                tfjs_s3_key=tfjs_s3_key,
+                is_active="test" not in tags,
             )
-        except:
-            logger.info("Failed to upload results to database")
+        except Exception as e:
+            logger.info(f"Failed to upload results to database {e}")
             pass
         finally:
             session.close()

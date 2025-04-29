@@ -1,5 +1,7 @@
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.orm import Session
+
 from .models import ModelResults
 
 
@@ -20,6 +22,8 @@ class DatabaseWriter:
         tags: List[str],
         results_s3_key: str,
         model_s3_key: str,
+        tfjs_s3_key: str,
+        is_active: Optional[bool],
     ) -> ModelResults:
         model_result = ModelResults(
             datasetId=dataset_id,
@@ -33,8 +37,9 @@ class DatabaseWriter:
             tags=tags,
             resultsS3Key=results_s3_key,
             modelS3Key=model_s3_key,
+            tfjsS3Key=tfjs_s3_key,
+            isActive=is_active,
         )
         self.session.add(model_result)
         self.session.commit()
         return model_result
-

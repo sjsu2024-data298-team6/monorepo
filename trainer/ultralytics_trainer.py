@@ -1,13 +1,15 @@
-from typing import Dict, Tuple
-import torch
-import yaml
-from ultralytics import YOLO, RTDETR
-import matplotlib.pyplot as plt
+import logging
 import os
 from pathlib import Path
-from trainer.params import *
-import logging
+from typing import Dict, Tuple
+
+import matplotlib.pyplot as plt
+import torch
 import wandb
+import yaml
+from ultralytics import RTDETR, YOLO
+
+import trainer.params as tparams
 from aws_handler import SNSHandler
 from keys import GeneralKeys, TrainerKeys
 
@@ -15,36 +17,33 @@ logger = None
 wandb.login(key=GeneralKeys.WANDB_KEY)
 sns = SNSHandler()
 
-params_ = {
-    TrainerKeys.MODEL_YOLO: yolo_params,
-    TrainerKeys.MODEL_YOLO_CUSTOM: yolo_params,
-    TrainerKeys.MODEL_RTDETR: rtdetr_params,
-}
-
 
 def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
     logger = logger_
     assert isinstance(logger, logging.Logger)
 
     project = "MSDA_Capstone_Project"
-    model_params = params_[model_]()
-    logger.info(f"Params: {model_params}")
-    run = wandb.init(
-        project=project,
-        tags=extra_keys_["tags"],
-        entity=GeneralKeys.WANDB_ENTITY,
-        config=model_params.__dict__,
-    )
+    params = None
+
+    if model_ in TrainerKeys.USE_YOLO:
+        params = tparams.yolo_params()
+    elif model_ in TrainerKeys.USE_RTDETR:
+        params = tparams.rtdetr_params()
+    else:
+        logger.warning("Something went wrong trying to check for model parameters")
+        sns.send("Training Failed", "Something went wrong trying to check for model parameters")
+        exit()
+
+    logger.info(f"Params: {params}")
+    run = wandb.init(project=project, tags=extra_keys_["tags"], entity=GeneralKeys.WANDB_ENTITY, config=params.__dict__)
 
     logger.info(f"Detailed logs at: {run.url}")
     sns.send(f"Training {model_}", f"Detailed logs at: {run.url}")
 
-    if model_ == TrainerKeys.MODEL_YOLO:
-        model = YOLO("yolo11s.yaml")
-    elif model_ == TrainerKeys.MODEL_RTDETR:
-        model = RTDETR("rtdetr-l.yaml")
-    elif model_ == TrainerKeys.MODEL_YOLO_CUSTOM:
-        model = YOLO("./config.yaml")
+    if model_ in TrainerKeys.USE_YOLO:
+        model = YOLO("./yolov8s-custom.yaml")
+    elif model_ in TrainerKeys.USE_RTDETR:
+        model = RTDETR("./rtdetr-custom.yaml")
     else:
         raise Exception(f"Unsupported ultralytics model: {model_}")
 
@@ -55,9 +54,9 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
 
     model.train(
         data=cwd / "data/data.yaml",
-        epochs=model_params.epochs,
-        imgsz=model_params.imgsz,
-        batch=model_params.batch,
+        epochs=params.epochs,
+        imgsz=params.imgsz,
+        batch=params.batch,
         device=device,
         project=project,
     )
@@ -78,9 +77,7 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
 
     for encoding in ["utf-8", "latin-1", "ascii"]:
         try:
-            with open(
-                "./wandb/latest-run/files/output.log", "r", encoding=encoding
-            ) as fd:
+            with open("./wandb/latest-run/files/output.log", "r", encoding=encoding) as fd:
                 content = fd.readlines()
             break
         except UnicodeDecodeError:
@@ -96,13 +93,27 @@ def train_main(logger_, model_, extra_keys_) -> Tuple[str, Path, Dict]:
             idx = i + 1
     mAPScores = content[idx].split()
 
+    best_wt = runs_dir / "train/weights/best.pt"
+    tfjs_path = ""
+    if model_ in TrainerKeys.TFJS_SUPPORTED_YOLO_MODELS:
+        model = YOLO(best_wt)
+        logger.info("Starting model conversion to tfjs format")
+        try:
+            model.export(format="tfjs", half=True)
+            tfjs_path = f"{project}/train/weights/best_web_model"
+        except Exception as e:
+            logger.info(f"Failed to convert model to tfjs format: {e}")
+    else:
+        logger.info(f"{model_} does not support conversion to tfjs format")
+
     return (
         inference_info,
         runs_dir,
         {
-            "params": model_params.__dict__,
+            "params": params.__dict__,
             "extras": {"wandb_logs": run.url},
-            "best_wt": runs_dir / "train/weights/best.pt",
+            "best_wt": best_wt,
+            "tfjs_path": tfjs_path,
             "map50": mAPScores[-2],
             "map5095": mAPScores[-1],
         },
@@ -136,10 +147,9 @@ def get_inference(model, test_base, runs_dir) -> str:
     names = model.names
 
     num_per_class = {name: 0 for _, name in names.items()}
-    avg_iou_per_class = {name: 0 for _, name in names.items()}
+    avg_iou_per_class = {name: 0.0 for _, name in names.items()}
 
     for idx, result in enumerate(pred):
-
         gt_boxes = []
         image_name = os.path.basename(result.path)
         img = plt.imread(result.path)  # Read the image to get its dimensions
@@ -180,9 +190,7 @@ def get_inference(model, test_base, runs_dir) -> str:
         results.append(f"{key} iou: {avg_iou}")
 
     try:
-        results.append(
-            f"Average IoU: {sum(avg_iou_per_class.values())/sum(num_per_class.values())}"
-        )
+        results.append(f"Average IoU: {sum(avg_iou_per_class.values()) / sum(num_per_class.values())}")
     except ZeroDivisionError:
         results.append("Average IoU: -1")
 
@@ -190,7 +198,7 @@ def get_inference(model, test_base, runs_dir) -> str:
     for idx, result in enumerate(pred):
         inference += result.speed["inference"]
 
-    results.append(f"Average inference time: {inference/len(pred)}")
+    results.append(f"Average inference time: {inference / len(pred)}")
     results = "\n".join(results)
 
     with open(runs_dir / "summary_results.txt", "w") as f:
