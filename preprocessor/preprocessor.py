@@ -514,8 +514,7 @@ def listen_to_sqs():
                 ########################################################
                 elif task == "dataset":
                     process_and_upload_dataset(data)
-                    print(data)
-                    exit()
+                    continue
                 ########################################################
                 else:
                     logger.warning(f"Task type {task} not supported")
