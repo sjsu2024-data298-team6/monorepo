@@ -101,7 +101,9 @@ def check_valid_combination_id(combine_id) -> Tuple[bool, str, Optional[Dataset]
     return is_valid, "", dataset_obj
 
 
-def upload_dataset_and_make_entry(name, tags, links, dir_name, checksum_blob, key):
+def upload_dataset_and_make_entry(
+    name, tags, links, dir_name, checksum_blob, key
+) -> Tuple[bool, int, Tuple[str, str], str]:
     current_ts = str(int(time.time()))
     checksum_fn = f"checksum_{current_ts}.txt"
     zip_name = f"{key}_{current_ts}.zip"
@@ -114,14 +116,13 @@ def upload_dataset_and_make_entry(name, tags, links, dir_name, checksum_blob, ke
 
     dataset_type = queries().get_dataset_type_by_value(key)
     if dataset_type is None:
-        logger.warning(f"{key} dataset type does not exist? Check database")
-        return
+        return False, -1, ("", ""), f"{key} dataset type does not exist? Check database"
 
     ### upload to s3 and make db entry
-    s3.upload_file_to_s3(checksum_fn, "dataset", checksum_fn)
-    s3.upload_zip_to_s3(dir_name, "dataset", zip_name=zip_name)
+    _, checksum_key = s3.upload_file_to_s3(checksum_fn, "dataset", checksum_fn)
+    _, dataset_key = s3.upload_zip_to_s3(dir_name, "dataset", zip_name=zip_name)
     assert isinstance(dataset_type.id, int)
-    writer.create_dataset(
+    new_entry = writer.create_dataset(
         datasetTypeId=dataset_type.id,
         name=name,
         tags=tags,
@@ -129,6 +130,8 @@ def upload_dataset_and_make_entry(name, tags, links, dir_name, checksum_blob, ke
         s3Key=f"dataset/{zip_name}",
         checksumBlobS3Key=f"dataset/{checksum_fn}",
     )
+    assert isinstance(new_entry.id, int)
+    return True, new_entry.id, (checksum_key, dataset_key), ""
 
 
 def process_and_upload_dataset(data):
@@ -221,14 +224,43 @@ def process_and_upload_dataset(data):
                 img_checksum = hashlib.md5(img_path.read_bytes()).hexdigest()
                 checksum_blob.append(img_checksum)
 
-    upload_dataset_and_make_entry(dataset_name, tags, links, dir_name, checksum_blob, DatasetKeys.YOLO_FORMAT)
+    upload_yolo, new_yolo_id, (checksum_key, yolo_key), msg = upload_dataset_and_make_entry(
+        dataset_name, tags, links, dir_name, checksum_blob, DatasetKeys.YOLO_FORMAT
+    )
+    if not upload_yolo:
+        logger.warning(msg)
+        return
     yolo_to_coco(dir_name, names)
-    upload_dataset_and_make_entry(dataset_name, tags, links, dir_name, checksum_blob, DatasetKeys.COCO_FORMAT)
+    upload_coco, new_coco_id, (_, coco_key), msg = upload_dataset_and_make_entry(
+        dataset_name, tags, links, dir_name, checksum_blob, DatasetKeys.COCO_FORMAT
+    )
+    if not upload_coco:
+        logger.warning(msg)
+        return
 
     logger.info("Dataset conversions complete")
     sns.send(
         f"Converting {dtype} dataset",
         f"Converted dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}\ndatasets location: {GeneralKeys.S3_BUCKET_NAME}/datasets/",
+    )
+
+    sns.send(
+        f"Converting {dtype} dataset | {dataset_name} | complete",
+        "\n".join(
+            [
+                f"Dataset: {dataset_name}",
+                f"Converting {dtype} dataset | Complete",
+                f"timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"uploaded yolo dataset id: {new_yolo_id}",
+                f"uploaded yolo s3 key: {yolo_key}",
+                f"uploaded coco dataset id: {new_coco_id}",
+                f"uploaded coco s3 key: {coco_key}",
+                f"uploaded checksum blob file s3 key: {checksum_key}",
+                f"tags: {tags}\n\n",
+                "Data dump:",
+                json.dumps(data),
+            ]
+        ),
     )
     cleanup()
     return
