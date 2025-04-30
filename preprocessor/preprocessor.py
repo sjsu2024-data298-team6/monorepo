@@ -1,5 +1,5 @@
-import ast
 import hashlib
+import json
 import logging
 import os
 import shutil
@@ -13,7 +13,9 @@ import wget
 import yaml
 
 from aws_handler import S3Handler, SNSHandler
+from db import db_manager
 from db.queries import queries
+from db.writer import DatabaseWriter
 from keys import DatasetKeys, GeneralKeys, PreProcessorKeys, TrainerKeys
 from preprocessor.dataset import (
     convert_mask_to_bbox,
@@ -29,32 +31,104 @@ sns = SNSHandler(logger=logger)
 s3 = S3Handler(bucket=GeneralKeys.S3_BUCKET_NAME, logger=logger)
 
 
-def process_and_upload_dataset(url, dtype, names=None):
-    sns.send(
-        f"Converting {dtype} dataset", f"Converting dataset from {url}\ntimestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}"
-    )
-    if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
-        logger.warning(f"{dtype} download type not supported")
+def process_and_upload_dataset(data):
+    dataset_name = data.get("name", None)
+    url = data.get("url", None)
+    dtype = data.get("datasetType", None)
+    if dataset_name is None or url is None or dtype is None:
+        logger.warning(f"Something went wrong trying to process {json.dumps(data)}")
+        sns.send(
+            "Something went wrong",
+            f"Something went wrong trying process_and_upload_dataset with the following:\n\n{json.dumps(data)}",
+        )
         return
 
-    # check existing dataset
-    should_combine = False
-    if s3.check_file_exists(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", logger=logger):
-        logger.info("Dataset already exists in s3, combining with new dataset")
-        s3.download_file(f"dataset/{DatasetKeys.YOLO_FORMAT}.zip", "yolo_old.zip")
-        should_combine = True
+    should_combine = data.get("shouldCombine", False)
+    combine_id = data.get("combineID", None)
+    if should_combine and combine_id is None:
+        logger.warning(f"combine_id is required when should_combine is True {json.dumps(data)}")
+        sns.send(
+            "Something went wrong",
+            f"process_and_upload_dataset tried to combine without combine id:\n\n{json.dumps(data)}",
+        )
+        return
+
+    if dtype not in PreProcessorKeys.SUPPORTED_TYPES:
+        logger.warning(f"{dtype} download type not supported")
+        sns.send(
+            "Something went wrong",
+            f"{dtype} download type not supported",
+        )
+        return
+
+    tags = data.get("tags", [dataset_name.lower().replace(" ", "-").strip()])
+
+    sns.send(
+        f"Converting {dtype} dataset | {dataset_name}",
+        "\n".join(
+            [
+                f"Converting {dtype} dataset",
+                f"timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"tags: {tags}\n\n",
+                "Data dump:",
+                json.dumps(data),
+            ]
+        ),
+    )
+
+    dataset_obj = None
+    links = [url]
+    if should_combine:
+        logger.info("Finding dataset to combine with")
+        dataset_obj = queries().get_dataset_by_id(combine_id)
+        if dataset_obj is None:
+            msg = f"Dataset at id {combine_id} not found"
+            logger.info(msg)
+            sns.send("Error", msg)
+            return
+        if dataset_obj.datasetType.value == "coco":
+            # Assumption is that yolo will always be defined before coco
+            # The rest of the code assumes a yolo format will be combined with before continuing
+            logger.info("A coco dataset was provided to combine, attempting to find yolo format")
+            combine_id -= 1
+            dataset_obj_old = dataset_obj
+            dataset_obj = queries().get_dataset_by_id(combine_id)
+            if dataset_obj is None:
+                msg = f"Dataset at id {combine_id} not found"
+                logger.info(msg)
+                sns.send("Error", msg)
+                return
+            if dataset_obj.datasetType.value != "yolo":
+                logger.warning("Could not find yolo format for combining, creating new dataset without combination")
+                sns.send(
+                    f"Converting {dtype} dataset | {dataset_name} | IMPORTANT",
+                    "\n".join(
+                        [
+                            "Could not find yolo format of provided dataset, cannot combine!",
+                            "Instead, the dataset will be uploaded and converted on its own",
+                            f"timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                            "Tried combining with",
+                            f"Database entry for ID {combine_id}:\n",
+                            f"{dataset_obj_old}",
+                            f"Database entry fix attempt ID {combine_id - 1}:\n",
+                            f"{dataset_obj}",
+                        ]
+                    ),
+                )
+                should_combine = False
+        if should_combine:
+            assert isinstance(dataset_obj.links, list)
+            assert isinstance(dataset_obj.tags, list)
+            links.extend(dataset_obj.links)
+            links = list(set(links))
+            tags.extend(dataset_obj.tags)
+            tags = list(set(tags))
+            s3.download_file(dataset_obj.s3Key, "yolo_old.zip")
 
     dir_name = None
 
     ### Create YOLO format of datasets
     if dtype == PreProcessorKeys.TYPE_ROBOFLOW:
-        if names is not None:
-            logger.warning(
-                "class names have been provided for roboflow dataset,"
-                + " however roboflow does not need them."
-                + " Provided class names will be discarded"
-            )
-
         logger.info(f"Started download for roboflow dataset at {url}")
         dir_name = download_dataset_from_roboflow(url, PreProcessorKeys.ROBOFLOW_YOLOV11, PreProcessorKeys.ROBOFLOW_KEY)
         dir_name = Path(dir_name)
@@ -88,10 +162,6 @@ def process_and_upload_dataset(url, dtype, names=None):
                     fd.write(clean)
 
     elif dtype == PreProcessorKeys.TYPE_VISDRONE:
-        if names is None:
-            logger.error("Names are required for visdrone")
-            return
-
         logger.info(f"Started download for dataset at {url}")
         wget.download(url=url, out="visdrone.zip", bar=None)
         with zipfile.ZipFile("visdrone.zip", "r") as zipf:
@@ -100,11 +170,15 @@ def process_and_upload_dataset(url, dtype, names=None):
             zipf.extractall()
 
         logger.info("Converting dataset to YOLO format")
+        names = PreProcessorKeys.VISDRONE_CLASSES
         visdrone2yolo(dir_name, names)
 
         os.remove("visdrone.zip")
 
-    ### Make sure stuff is working
+    else:
+        logger.info("Should not have gotten here")
+        return
+
     try:
         assert isinstance(dir_name, Path)
         assert isinstance(names, list)
@@ -113,12 +187,18 @@ def process_and_upload_dataset(url, dtype, names=None):
         return
 
     checksum_blob = []
-    if s3.check_file_exists("dataset/checksum_blob.txt", logger=logger):
-        s3.download_file("dataset/checksum_blob.txt", "checksum_blob.txt")
-        with open("checksum_blob.txt", "r") as fd:
-            checksum_blob = fd.read().splitlines()
-
     if should_combine:
+        try:
+            assert dataset_obj is not None
+        except AssertionError:
+            logger.error("Something went wrong when asserting dataset_obj during combining step")
+            return
+
+        if s3.check_file_exists(dataset_obj.checksumBlobS3Key, logger=logger):
+            s3.download_file(dataset_obj.checksumBlobS3Key, "checksum_blob.txt")
+            with open("checksum_blob.txt", "r") as fd:
+                checksum_blob = fd.read().splitlines()
+            os.remove("checksum_blob.txt")
         logger.info("Combining datasets")
 
         with zipfile.ZipFile("yolo_old.zip", "r") as z:
@@ -185,13 +265,33 @@ def process_and_upload_dataset(url, dtype, names=None):
                 img_checksum = hashlib.md5(img_path.read_bytes()).hexdigest()
                 checksum_blob.append(img_checksum)
 
-    with open("./checksum_blob.txt", "w") as fd:
+    current_ts = str(int(time.time()))
+    checksum_fn = f"checksum_{current_ts}.txt"
+    zip_name = f"{DatasetKeys.YOLO_FORMAT}_{current_ts}.zip"
+
+    with open(checksum_fn, "w") as fd:
         fd.write("\n".join(checksum_blob))
 
-    s3.upload_file_to_s3("./checksum_blob.txt", "dataset", "checksum_blob.txt")
+    session = next(db_manager.get_db())
+    writer = DatabaseWriter(session)
 
-    ### Zip and upload to s3
-    s3.upload_zip_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.YOLO_FORMAT}.zip")
+    yolo_dataset_type = queries().get_dataset_type_by_value("yolo")
+    if yolo_dataset_type is None:
+        logger.warning("YOLO dataset type does not exist? Check database")
+        return
+
+    ### upload to s3 and make db entry
+    s3.upload_file_to_s3(checksum_fn, "dataset", checksum_fn)
+    s3.upload_zip_to_s3(dir_name, "dataset", zip_name=zip_name)
+    assert isinstance(yolo_dataset_type.id, int)
+    writer.create_dataset(
+        datasetTypeId=yolo_dataset_type.id,
+        name=dataset_name,
+        tags=tags,
+        links=links,
+        s3Key=f"dataset/{zip_name}",
+        checksumBlobS3Key=f"dataset/{checksum_fn}",
+    )
 
     ### Convert to COCO format
     splits = ["test", "train", "valid"]
@@ -208,7 +308,27 @@ def process_and_upload_dataset(url, dtype, names=None):
             shutil.move(str(file_path), str(dir_name / split))
         os.rmdir(dir_name / split / "images")
     os.remove(dir_name / "data.yaml")
-    s3.upload_zip_to_s3(dir_name, "dataset", zip_name=f"{DatasetKeys.COCO_FORMAT}.zip")
+
+    zip_name = f"{DatasetKeys.COCO_FORMAT}_{current_ts}.zip"
+
+    coco_dataset_type = queries().get_dataset_type_by_value("coco")
+    if coco_dataset_type is None:
+        logger.warning("coco dataset type does not exist? Check database")
+        return
+
+    ### upload to s3 and make db entry
+    s3.upload_file_to_s3(checksum_fn, "dataset", checksum_fn)
+    s3.upload_zip_to_s3(dir_name, "dataset", zip_name=zip_name)
+    assert isinstance(coco_dataset_type.id, int)
+    writer.create_dataset(
+        datasetTypeId=coco_dataset_type.id,
+        name=dataset_name,
+        tags=tags,
+        links=links,
+        s3Key=f"dataset/{zip_name}",
+        checksumBlobS3Key=f"dataset/{checksum_fn}",
+    )
+
     shutil.rmtree(dir_name)
 
     logger.info("Dataset conversions complete")
@@ -354,7 +474,7 @@ def listen_to_sqs():
         if "Messages" in response:
             message = response["Messages"][0]
             receipt_handle = message["ReceiptHandle"]
-            body = ast.literal_eval(message["Body"])
+            body = json.loads(message["Body"])
             data = body["data"]
             task = body["task"]
             try:
@@ -393,15 +513,9 @@ def listen_to_sqs():
                     continue
                 ########################################################
                 elif task == "dataset":
-                    url = data["url"]
-                    dtype = data["datasetType"]
-                    names = data["names"]
-                    if type(names) is str:
-                        names = names.split(",")
-
-                    # Process the dataset
-                    process_and_upload_dataset(url=url, dtype=dtype, names=names)
-                    continue
+                    process_and_upload_dataset(data)
+                    print(data)
+                    exit()
                 ########################################################
                 else:
                     logger.warning(f"Task type {task} not supported")
@@ -425,18 +539,6 @@ def listen_to_sqs():
 
 
 def run():
-    if GeneralKeys.DEPLOYMENT == "dev":
-        model = "yolov8_base"
-        params = '{"epochs": 10, "imgsz": 640, "batch": 8}'
-        data = {
-            "params": params,
-            "model": "yolov8_base",
-            "yaml_utkey": "https://raw.githubusercontent.com/sjsu2024-data298-team6/ultralytics/9d0c4cadcce475aa5e143373a357a8da00729367/ultralytics/cfg/models/v8/yolov8.yaml",
-            "datasetId": 1,
-            "tags": ["test"],
-        }
-        print(trigger_training(model, params, data))
-        exit()
     sns.send("Preprocessor", "Preprocessor started/restarted")
     logger.info("Preprocessor started/restarted")
     listen_to_sqs()
