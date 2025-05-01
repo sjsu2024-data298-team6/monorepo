@@ -314,6 +314,8 @@ def trigger_training(model, params, data):
         extra_commands.append(f"echo 'DATASET_ID={data['datasetId']}' >> .extra")
 
     extra_commands.append(f"echo 'MODEL_ID={model_id}' >> .extra")
+    model_name = data["modelName"]
+    extra_commands.append(f"echo 'MODEL_NAME={model_name}' >> .extra")
 
     extra_commands = "\n".join(extra_commands)
 

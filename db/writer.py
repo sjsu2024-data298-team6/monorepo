@@ -34,6 +34,7 @@ class DatabaseWriter:
         self,
         dataset_id: int,
         model_type_id: int,
+        model_name: str,
         params: Dict[str, Any],
         extras: Dict[str, Any],
         iou_score: Optional[float],
@@ -49,6 +50,7 @@ class DatabaseWriter:
         model_result = ModelResults(
             datasetId=dataset_id,
             modelTypeId=model_type_id,
+            modelName=model_name,
             params=params,
             extras=extras,
             iouScore=iou_score,

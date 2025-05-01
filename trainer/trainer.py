@@ -124,8 +124,16 @@ def run():
     download_dataset_from_s3(dataset)
 
     sns.send(
-        f"Training {model}",
-        f"Model:{model}\nDataset s3 key:{dataset}\nTags:{tags}\nStarted training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        f"Training {model} | {extra_keys['MODEL_NAME']}",
+        "\n".join(
+            [
+                f"Model Name: {extra_keys['MODEL_NAME']}",
+                f"Model type:{model}",
+                f"Dataset s3 key:{dataset}",
+                f"Tags:{tags}",
+                f"Started training: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+            ]
+        ),
     )
 
     time_start = time.time()
@@ -159,6 +167,7 @@ def run():
             writer.create_model_result(
                 dataset_id=int(extra_keys["DATASET_ID"]),
                 model_type_id=int(extra_keys["MODEL_ID"]),
+                model_name=str(extra_keys["MODEL_NAME"]),
                 params=the_rest["params"],
                 extras=extras,
                 iou_score=iou,

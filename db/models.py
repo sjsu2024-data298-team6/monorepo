@@ -80,3 +80,4 @@ class ModelResults(Base):
     modelS3Key = Column(String, nullable=False)
     tfjsS3Key = Column(String, nullable=False)
     isActive = Column(Boolean, nullable=False, default=True)
+    modelName = Column(String, default="")
