@@ -7,7 +7,7 @@ import time
 import traceback
 import zipfile
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import boto3
 import wget
@@ -101,6 +101,24 @@ def check_valid_combination_id(combine_id) -> Tuple[bool, str, Optional[Dataset]
     return is_valid, "", dataset_obj
 
 
+def check_dataset_with_same_links_already_exists(links, should_combine) -> Tuple[bool, str]:
+    dataset_objs: List[Dataset] = queries().datasets_with_same_links(links)
+    if len(dataset_objs) == 0:
+        return False, ""
+    msg = []
+    if should_combine:
+        msg.append(f"You attempted to combine datasets resulting in the following source links: {links}")
+    else:
+        msg.append(f"You attempted to upload a dataset with the following source link: {links}")
+    msg.append("A similar dataset already exists!")
+    msg.append("Please use one of the following datasets for training as appropriate")
+    msg.append("ID   | Dataset Name")
+    for dataset_obj in dataset_objs:
+        msg.append(f"{dataset_obj.id:<4} | {dataset_obj.name}")
+
+    return True, "\n".join(msg)
+
+
 def upload_dataset_and_make_entry(
     name, tags, links, dir_name, checksum_blob, key
 ) -> Tuple[bool, int, Tuple[str, str], str]:
@@ -148,19 +166,6 @@ def process_and_upload_dataset(data):
     combine_id = data.get("combineID", None)
     tags = data.get("tags", [dataset_name.lower().replace(" ", "-").strip()])
 
-    sns.send(
-        f"Converting {dtype} dataset | {dataset_name} | start",
-        "\n".join(
-            [
-                f"Converting {dtype} dataset | Start",
-                f"timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-                f"tags: {tags}\n\n",
-                "Data dump:",
-                json.dumps(data),
-            ]
-        ),
-    )
-
     dataset_obj = None
     links = [url]
     if should_combine:
@@ -173,11 +178,29 @@ def process_and_upload_dataset(data):
             links = list(set(links))
             tags.extend(dataset_obj.tags)
             tags = list(set(tags))
-            s3.download_file(dataset_obj.s3Key, "yolo_old.zip")
         else:
             should_combine = False
             logger.warning(msg)
             sns.send(f"Converting {dtype} dataset | {dataset_name} | IMPORTANT", msg)
+
+    alredy_exists, msg = check_dataset_with_same_links_already_exists(links, should_combine)
+    if alredy_exists:
+        logger.warning(msg)
+        sns.send(f"Converting {dtype} dataset | {dataset_name} | IMPORTANT", msg)
+        return
+
+    sns.send(
+        f"Converting {dtype} dataset | {dataset_name} | start",
+        "\n".join(
+            [
+                f"Converting {dtype} dataset | Start",
+                f"timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+                f"tags: {tags}\n\n",
+                "Data dump:",
+                json.dumps(data),
+            ]
+        ),
+    )
 
     dir_name = None
     names = None
@@ -216,6 +239,8 @@ def process_and_upload_dataset(data):
 
     checksum_blob = []
     if should_combine:
+        assert isinstance(dataset_obj, Dataset)
+        s3.download_file(dataset_obj.s3Key, "yolo_old.zip")
         dir_name, checksum_blob, skipped = perform_combine(dataset_obj, dir_name, s3)
         logger.info(f"Finished combining datasets with {skipped} images skipped")
     else:
@@ -262,7 +287,6 @@ def process_and_upload_dataset(data):
             ]
         ),
     )
-    cleanup()
     return
 
 
@@ -395,7 +419,6 @@ def cleanup():
     keywords = ["yolo", "coco", "visdrone", "checksum", "old"]
     for item in os.listdir("."):
         if any(keyword in item for keyword in keywords):
-            print(item)
             path = os.path.join(".", item)
             if os.path.isdir(path):
                 shutil.rmtree(path)
@@ -453,6 +476,7 @@ def listen_to_sqs():
                 ########################################################
                 elif task == "dataset":
                     process_and_upload_dataset(data)
+                    cleanup()
                     continue
                 ########################################################
                 else:

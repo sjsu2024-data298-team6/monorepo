@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,15 @@ class QueryEngine:
         if model is not None:
             return model.id
         return -1
+
+    def datasets_with_same_links(self, links: List[str]) -> List[Dataset]:
+        datasets = self.db.query(Dataset).all()
+
+        def check(x: Dataset) -> bool:
+            assert isinstance(x.links, list)
+            return set(x.links) == set(links)
+
+        return list(filter(check, datasets))
 
 
 def queries() -> QueryEngine:
