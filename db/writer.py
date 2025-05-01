@@ -2,12 +2,33 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from .models import ModelResults
+from .models import Dataset, ModelResults
 
 
 class DatabaseWriter:
     def __init__(self, session: Session):
         self.session = session
+
+    def create_dataset(
+        self,
+        datasetTypeId: int,
+        name: str,
+        tags: List[str],
+        links: List[str],
+        s3Key: str,
+        checksumBlobS3Key: str,
+    ) -> Dataset:
+        dataset = Dataset(
+            datasetTypeId=datasetTypeId,
+            name=name,
+            tags=tags,
+            links=links,
+            s3Key=s3Key,
+            checksumBlobS3Key=checksumBlobS3Key,
+        )
+        self.session.add(dataset)
+        self.session.commit()
+        return dataset
 
     def create_model_result(
         self,

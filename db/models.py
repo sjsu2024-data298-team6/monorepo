@@ -1,3 +1,5 @@
+import json
+
 from sqlalchemy import ARRAY, JSON, Boolean, Column, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
@@ -44,6 +46,20 @@ class Dataset(Base):
     tags = Column(ARRAY(String), nullable=False)
     modelResults = relationship("ModelResults", back_populates="dataset")
     name = Column(String, default="")
+    checksumBlobS3Key = Column(String, default="")
+
+    def __str__(self):
+        return json.dumps(
+            {
+                "id": self.id,
+                "datasetTypeId": self.datasetTypeId,
+                "s3Key": self.s3Key,
+                "links": self.links,
+                "tags": self.tags,
+                "name": self.name,
+                "checksumBlobS3Key": self.checksumBlobS3Key,
+            }
+        )
 
 
 class ModelResults(Base):

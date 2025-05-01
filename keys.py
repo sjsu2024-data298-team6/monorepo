@@ -21,7 +21,21 @@ class PreProcessorKeys:
 
     TYPE_ROBOFLOW = "roboflow"
     TYPE_ZIPFILE = "zipfile"
+
     TYPE_VISDRONE = "visdrone"
+    VISDRONE_CLASSES = [
+        "pedestrian",
+        "people",
+        "bicycle",
+        "car",
+        "van",
+        "truck",
+        "tricycle",
+        "awning-tricycle",
+        "bus",
+        "motor",
+    ]
+
     SUPPORTED_TYPES = {
         TYPE_ROBOFLOW,
         TYPE_VISDRONE,
