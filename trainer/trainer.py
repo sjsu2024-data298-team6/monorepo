@@ -1,9 +1,12 @@
 import json
 import logging
 import os
+from dataclasses import asdict, dataclass
 import shutil
 import time
 import traceback
+from typing import Tuple, List
+from pathlib import Path
 import zipfile
 
 from aws_handler import S3Handler, SNSHandler
@@ -11,6 +14,38 @@ from db import db_manager
 from db.queries import queries
 from db.writer import DatabaseWriter
 from keys import DatasetKeys, GeneralKeys, PreProcessorKeys, TrainerKeys
+
+
+@dataclass
+class ClassMetrcis:
+    name: str
+    precision: float
+    recall: float
+    map50: float
+    map5095: float
+    iou: float | None
+
+
+@dataclass
+class AllMetrics:
+    precision: float
+    recall: float
+    map50: float
+    map5095: float
+    iou: float | None
+    inference_time: float
+    class_metrics: List[ClassMetrcis]
+
+
+@dataclass
+class TrainingResultClass:
+    runs_dir: Path
+    params: dict
+    wandb_logs: str
+    best_wt: Path
+    tfjs_path: Path | None
+    metrics_str: str
+    metrics: AllMetrics | None
 
 
 class JsonFormatter(logging.Formatter):
@@ -57,22 +92,19 @@ def download_dataset_from_s3(s3_key):
             z.extractall("data")
 
 
-def train(model, extra_keys):
-    logger.info(f"Started training for {model}")
+def train(model, extra_keys) -> Tuple[TrainingResultClass | str, bool]:
+    model_name = extra_keys["MODEL_NAME"]
+    logger.info(f"Started training for {model} | {model_name}")
     if model in TrainerKeys.ULTRALYTICS_TRAINER:
         from trainer.ultralytics_trainer import train_main
     else:
-        return ("Model {model} not yet supported", None, None), False
+        return f"Model {model} not yet supported", False
 
     try:
         return train_main(logger, model, extra_keys), True
     except Exception as e:
         return (
-            (
-                f"Training of model '{model}' failed somewhere, please check manually\n\n\nExcpetion:\n{e}\n\n\nTraceback:\n{traceback.format_exc()}",
-                None,
-                None,
-            ),
+            f"Training of model '{model} | {model_name}' failed somewhere, please check manually\n\n\nExcpetion:\n{e}\n\n\nTraceback:\n{traceback.format_exc()}",
             False,
         )
 
@@ -137,29 +169,32 @@ def run():
     )
 
     time_start = time.time()
-    (model_results, runs_dir, the_rest), success = train(model, extra_keys)
+    model_results, success = train(model, extra_keys)
 
     time_taken = time.time() - time_start
-    upload_message = ""
-    if success:
-        assert the_rest is not None
-        assert runs_dir is not None
+    upload_message = []
+    if success and GeneralKeys.DEPLOYMENT != "dev":
+        assert isinstance(model_results, TrainingResultClass)
         session = next(db_manager.get_db())
         try:
-            results = model_results.splitlines()
-            inf = float(results[-1].split(":")[-1].strip())
-            iou = float(results[-2].split(":")[-1].strip())
-
+            assert model_results.metrics is not None
             ts = int(time.time())
-            upload_message, s3_key = s3.upload_zip_to_s3(runs_dir, "runs/", f"{model}_{ts}.zip")
-            _, wt_key = s3.upload_file_to_s3(the_rest["best_wt"], "runs/", f"{model}_{ts}_weights.pt")
+            msg, s3_key = s3.upload_zip_to_s3(model_results.runs_dir, "runs/", f"{model}_{ts}.zip")
+            upload_message.append(msg)
+            msg, wt_key = s3.upload_file_to_s3(model_results.best_wt, "runs/", f"{model}_{ts}_weights.pt")
+            upload_message.append(msg)
 
             tfjs_s3_key = ""
-            if the_rest["tfjs_path"] != "":
-                shutil.move(the_rest["tfjs_path"], f"{model}_{ts}_weights_tfjs")
-                _, tfjs_s3_key = s3.upload_folder_to_s3(f"{model}_{ts}_weights_tfjs", "tfjs_models")
+            if model_results.tfjs_path is not None:
+                shutil.move(model_results.tfjs_path, f"{model}_{ts}_weights_tfjs")
+                msg, tfjs_s3_key = s3.upload_folder_to_s3(f"{model}_{ts}_weights_tfjs", "tfjs_models")
+                upload_message.append(msg)
 
-            extras = the_rest["extras"]
+            extras = {
+                "wandb_logs": model_results.wandb_logs,
+                "detailed_metrics": asdict(model_results.metrics),
+            }
+
             if "YAML_URL" in extra_keys.keys():
                 extras["YAML_URL"] = extra_keys["YAML_URL"]
 
@@ -168,12 +203,12 @@ def run():
                 dataset_id=int(extra_keys["DATASET_ID"]),
                 model_type_id=int(extra_keys["MODEL_ID"]),
                 model_name=str(extra_keys["MODEL_NAME"]),
-                params=the_rest["params"],
+                params=model_results.params,
                 extras=extras,
-                iou_score=iou,
-                inference_time=inf,
-                map50_score=the_rest["map50"],
-                map5095_score=the_rest["map5095"],
+                iou_score=model_results.metrics.iou,
+                inference_time=model_results.metrics.inference_time,
+                map50_score=model_results.metrics.map50,
+                map5095_score=model_results.metrics.map5095,
                 tags=tags,
                 model_s3_key=wt_key,
                 results_s3_key=s3_key,
@@ -188,8 +223,12 @@ def run():
 
     message = ["Training successful!" if success else "Training Failed!"]
     message.append(f"Runtime: {time_taken:.4f} seconds")
-    message.append(upload_message)
-    message.append(model_results)
+    message.append("\n".join(upload_message))
+    if isinstance(model_results, TrainingResultClass):
+        message.append(model_results.wandb_logs)
+        message.append(model_results.metrics_str)
+    else:
+        message.append(model_results)
 
-    message = "\n\n\n".join(message)
-    sns.send(f"Training {model}", message)
+    message = "\n\n".join(message)
+    sns.send(f"Training {model} | {extra_keys['MODEL_NAME']}", message)
