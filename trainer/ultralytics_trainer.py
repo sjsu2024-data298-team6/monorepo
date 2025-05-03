@@ -81,16 +81,17 @@ def train_main(logger_, model_, extra_keys_) -> TrainingResultClass:
 
     best_wt = runs_dir / "train/weights/best.pt"
     tfjs_path = None
-    if model_ in TrainerKeys.TFJS_SUPPORTED_YOLO_MODELS:
-        model = YOLO(best_wt)
-        logger.info("Starting model conversion to tfjs format")
-        try:
-            model.export(format="tfjs", half=True)
-            tfjs_path = runs_dir / "/train/weights/best_web_model"
-        except Exception as e:
-            logger.info(f"Failed to convert model to tfjs format: {e}")
-    else:
-        logger.info(f"{model_} does not support conversion to tfjs format")
+    # ## TODO: tfjs conversion often fails due to environment mismatches. Investigate and find a fix
+    # if model_ in TrainerKeys.TFJS_SUPPORTED_YOLO_MODELS:
+    #     model = YOLO(best_wt)
+    #     logger.info("Starting model conversion to tfjs format")
+    #     try:
+    #         model.export(format="tfjs", half=True)
+    #         tfjs_path = runs_dir / "/train/weights/best_web_model"
+    #     except Exception as e:
+    #         logger.info(f"Failed to convert model to tfjs format: {e}")
+    # else:
+    #     logger.info(f"{model_} does not support conversion to tfjs format")
 
     return TrainingResultClass(
         runs_dir=runs_dir,
