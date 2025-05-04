@@ -208,7 +208,7 @@ def format_results(metrics, names, num_per_class, avg_iou_per_class, pred) -> Al
     try:
         overall_iou = sum(avg_iou_per_class.values()) / sum(num_per_class.values())
     except ZeroDivisionError:
-        overall_iou = None
+        overall_iou = 0.0
 
     class_metrics_list = []
     ap_class_index = metrics.box.ap_class_index
@@ -217,7 +217,7 @@ def format_results(metrics, names, num_per_class, avg_iou_per_class, pred) -> Al
         try:
             class_iou = avg_iou_per_class[class_name] / num_per_class[class_name]
         except ZeroDivisionError:
-            class_iou = None
+            class_iou = 0.0
 
         class_metrics_list.append(
             ClassMetrcis(
@@ -251,9 +251,10 @@ def format_results_str(metrics, names, num_per_class, avg_iou_per_class, pred) -
     results.append(f"mAP@0.5: {metrics.box.map50:.4f}")
     results.append(f"mAP@0.5:0.95: {metrics.box.map:.4f}")
     try:
-        results.append(f"Average IoU: {sum(avg_iou_per_class.values()) / sum(num_per_class.values()):.4f}")
+        overall_iou = sum(avg_iou_per_class.values()) / sum(num_per_class.values())
     except ZeroDivisionError:
-        results.append("Average IoU: N/A")
+        overall_iou = 0.0
+    results.append(f"Average IoU: {overall_iou:.4f}")
     results.append(f"Average inference time: {inference_time / len(pred):.2f} ms")
 
     results.append("")
@@ -266,9 +267,8 @@ def format_results_str(metrics, names, num_per_class, avg_iou_per_class, pred) -
         class_name = names[class_idx]
         try:
             avg_iou = avg_iou_per_class[class_name] / num_per_class[class_name]
-            avg_iou_str = f"{avg_iou:.4f}"
         except ZeroDivisionError:
-            avg_iou_str = "N/A"
+            avg_iou = 0.0
 
         padded_class_name = class_name.ljust(max_class_name_len)
 
@@ -280,7 +280,7 @@ def format_results_str(metrics, names, num_per_class, avg_iou_per_class, pred) -
                     f"Recall: {metrics.box.r[i]:.4f}",
                     f"mAP@0.5: {metrics.box.ap50[i]:.4f}",
                     f"mAP@0.5:0.95: {metrics.box.ap[i]:.4f}",
-                    f"IoU: {avg_iou_str}",
+                    f"IoU: {avg_iou:.4f}",
                 ]
             )
         )
