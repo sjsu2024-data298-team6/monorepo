@@ -192,7 +192,7 @@ def run():
 
             extras = {
                 "wandb_logs": model_results.wandb_logs,
-                "detailed_metrics": asdict(model_results.metrics),
+                "detailed_metrics": str(asdict(model_results.metrics)),
             }
 
             if "YAML_URL" in extra_keys.keys():
