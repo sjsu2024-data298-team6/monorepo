@@ -222,21 +222,21 @@ def format_results(metrics, names, num_per_class, avg_iou_per_class, pred) -> Al
         class_metrics_list.append(
             ClassMetrcis(
                 name=class_name,
-                precision=metrics.box.p[i],
-                recall=metrics.box.r[i],
-                map50=metrics.box.ap50[i],
-                map5095=metrics.box.ap[i],
-                iou=class_iou,
+                precision=float(metrics.box.p[i]),
+                recall=float(metrics.box.r[i]),
+                map50=float(metrics.box.ap50[i]),
+                map5095=float(metrics.box.ap[i]),
+                iou=float(class_iou),
             )
         )
 
     return AllMetrics(
-        precision=metrics.box.mp,
-        recall=metrics.box.mr,
-        map50=metrics.box.map50,
-        map5095=metrics.box.map,
-        iou=overall_iou,
-        inference_time=inference_time / len(pred) if len(pred) > 0 else 0,
+        precision=float(metrics.box.mp),
+        recall=float(metrics.box.mr),
+        map50=float(metrics.box.map50),
+        map5095=float(metrics.box.map),
+        iou=float(overall_iou),
+        inference_time=float(inference_time / len(pred)) if len(pred) > 0 else 0.0,
         class_metrics=class_metrics_list,
     )
 

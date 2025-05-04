@@ -23,7 +23,7 @@ class ClassMetrcis:
     recall: float
     map50: float
     map5095: float
-    iou: float | None
+    iou: float
 
 
 @dataclass
@@ -32,7 +32,7 @@ class AllMetrics:
     recall: float
     map50: float
     map5095: float
-    iou: float | None
+    iou: float
     inference_time: float
     class_metrics: List[ClassMetrcis]
 
@@ -192,7 +192,7 @@ def run():
 
             extras = {
                 "wandb_logs": model_results.wandb_logs,
-                "detailed_metrics": str(asdict(model_results.metrics)),
+                "detailed_metrics": asdict(model_results.metrics),
             }
 
             if "YAML_URL" in extra_keys.keys():
