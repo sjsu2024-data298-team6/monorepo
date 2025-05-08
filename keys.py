@@ -58,6 +58,7 @@ class TrainerKeys:
     YOLOV8_DCE = "yolov8_dce"
     YOLOV8_INVO = "yolov8_invo"
     YOLOV8_MHSA = "yolov8_mhsa"
+    YOLOV8_MHSA_RTDETR = "yolov8_mhsa_rtdetr"
     YOLOV8_RESNET_SINGLE = "yolov8_resnet_single"
     YOLOV8_RESNET_DOUBLE = "yolov8_resnet_double"
     YOLOV8_RESNET_ALT = "yolov8_resnet_alt"
@@ -69,6 +70,7 @@ class TrainerKeys:
         YOLOV11_BASE,
         YOLOV8_DCE,
         YOLOV8_MHSA,
+        YOLOV8_MHSA_RTDETR,
         YOLOV8_RESNET_SINGLE,
         YOLOV8_RESNET_DOUBLE,
         RTDETR_BASE,
@@ -82,6 +84,7 @@ class TrainerKeys:
 
     USE_RTDETR = {
         RTDETR_BASE,
+        YOLOV8_MHSA_RTDETR,
         RTDETR_CUSTOM,
     }
 
@@ -99,7 +102,6 @@ class TrainerKeys:
     }
 
     TFJS_SUPPORTED_YOLO_MODELS = {
-        YOLOV8_MHSA,
         YOLOV8_BASE,
         YOLOV8_DCE,
         YOLOV8_INVO,
