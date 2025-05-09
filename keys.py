@@ -58,6 +58,7 @@ class TrainerKeys:
     YOLOV8_DCE = "yolov8_dce"
     YOLOV8_INVO = "yolov8_invo"
     YOLOV8_MHSA = "yolov8_mhsa"
+    YOLOV8_LITE = "yolov8_lite"
     YOLOV8_MHSA_RTDETR = "yolov8_mhsa_rtdetr"
     YOLOV8_RESNET_SINGLE = "yolov8_resnet_single"
     YOLOV8_RESNET_DOUBLE = "yolov8_resnet_double"
@@ -70,6 +71,7 @@ class TrainerKeys:
         YOLOV11_BASE,
         YOLOV8_DCE,
         YOLOV8_MHSA,
+        YOLOV8_LITE,
         YOLOV8_MHSA_RTDETR,
         YOLOV8_RESNET_SINGLE,
         YOLOV8_RESNET_DOUBLE,
@@ -93,6 +95,7 @@ class TrainerKeys:
         YOLOV8_BASE,
         YOLOV11_BASE,
         YOLOV8_DCE,
+        YOLOV8_LITE,
         YOLOV8_INVO,
         YOLOV8_RESNET_SINGLE,
         YOLOV8_RESNET_DOUBLE,
@@ -105,6 +108,7 @@ class TrainerKeys:
         YOLOV8_BASE,
         YOLOV8_DCE,
         YOLOV8_INVO,
+        YOLOV8_LITE,
         YOLOV8_RESNET_SINGLE,
         YOLOV8_RESNET_DOUBLE,
         YOLOV8_RESNET_ALT,
